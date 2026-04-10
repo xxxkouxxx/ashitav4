@@ -9,17 +9,24 @@ addon.author  = '7xxxk'
 addon.version = '2.0'
 addon.desc    = 'PLD向け即死技アラート + バフ切れ警告'
 
+require('common')
 local skills_def = require('BattleAssist_skills')
+local settings = require('settings')
 
 -- ============================================================
 -- 設定デフォルト値
 -- ============================================================
-local default_settings = {
+local default_settings = T{
     x       = 10,
     y       = 10,
     visible = true,
 }
-local cfg = {}
+local cfg = T{}
+
+-- 設定変更コールバック
+settings.register('settings', 'battleassist_settings_update', function(new_cfg)
+    cfg = new_cfg
+end)
 
 -- ============================================================
 -- 即死技アラート状態
@@ -44,7 +51,20 @@ local buff_check_timer = 0
 -- ============================================================
 -- デバッグモード（技ID実測時に true に変更する）
 -- ============================================================
-local DEBUG_PACKET = false
+local DEBUG_PACKET = true
+local DEBUG_LOG_FILE = AshitaCore:GetInstallPath() .. 'logs\\BattleAssist_debug.log'
+
+local function debug_log(msg)
+    if not DEBUG_PACKET then return end
+    local timestamp = os.date('%H:%M:%S')
+    local line = string.format('[%s] %s\n', timestamp, msg)
+    print('[BattleAssist DEBUG] ' .. msg)
+    local f = io.open(DEBUG_LOG_FILE, 'a')
+    if f then
+        f:write(line)
+        f:close()
+    end
+end
 
 -- ============================================================
 -- バフID定義（※要実測 - DEBUG_PACKET=true で確認すること）
@@ -83,12 +103,10 @@ ashita.events.register('packet_in', 'battleassist_packet_in', function(e)
     local category  = ashita.bits.unpack_be(e.data_raw, 0x0A * 8, 8)
 
     -- デバッグモード: 全アクションパケットをログ出力
-    if DEBUG_PACKET then
-        print(string.format(
-            '[BattleAssist DEBUG] actor=%08X action_id=%d category=%d',
-            actor_id, action_id, category
-        ))
-    end
+    debug_log(string.format(
+        'actor=%08X action_id=%d category=%d',
+        actor_id, action_id, category
+    ))
 
     -- パーティメンバーの技は無視
     local party = AshitaCore:GetMemoryManager():GetParty()
@@ -281,16 +299,7 @@ end)
 -- load イベント - 設定を読み込む
 -- ============================================================
 ashita.events.register('load', 'battleassist_load', function()
-    local saved = ashita.settings.load('BattleAssist')
-    if saved ~= nil then
-        cfg = saved
-    else
-        cfg = {
-            x       = default_settings.x,
-            y       = default_settings.y,
-            visible = default_settings.visible,
-        }
-    end
+    cfg = settings.load(default_settings)
     print('[BattleAssist] v2.0 loaded. Debug=' .. tostring(DEBUG_PACKET))
 end)
 
@@ -298,6 +307,6 @@ end)
 -- unload イベント - 設定を保存する
 -- ============================================================
 ashita.events.register('unload', 'battleassist_unload', function()
-    ashita.settings.save('BattleAssist', cfg)
+    settings.save()
     print('[BattleAssist] unloaded.')
 end)
