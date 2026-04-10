@@ -1,0 +1,15 @@
+# サウンドファイル（自分で配置するもの）
+**/sounds/*.wav
+**/sounds/*.mp3
+**/sounds/*.ogg
+
+# Ashita 設定ファイル（ローカル環境依存）
+**/settings/
+
+# OS生成ファイル
+Thumbs.db
+.DS_Store
+
+# エディタ
+*.swp
+*.bak
