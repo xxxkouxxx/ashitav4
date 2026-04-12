@@ -12,6 +12,7 @@ addon.desc    = 'PLD向け即死技アラート + バフ切れ警告'
 require('common')
 local skills_def = require('BattleAssist_skills')
 local settings = require('settings')
+local imgui = require('imgui')
 
 -- ============================================================
 -- 設定デフォルト値
@@ -47,11 +48,14 @@ local buff_alert = {
     timer   = 0,
 }
 local buff_check_timer = 0
+local debug_buff_timer = 0
+local prev_missing_count = 0   -- 前回のバフ切れ数（音を鳴らすタイミング判定用）
+local buff_watch_ready   = false  -- リロード直後の誤検知防止フラグ
 
 -- ============================================================
 -- デバッグモード（技ID実測時に true に変更する）
 -- ============================================================
-local DEBUG_PACKET = true
+local DEBUG_PACKET = false
 local DEBUG_LOG_FILE = AshitaCore:GetInstallPath() .. 'logs\\BattleAssist_debug.log'
 
 local function debug_log(msg)
@@ -69,8 +73,10 @@ end
 -- ============================================================
 -- バフID定義（※要実測 - DEBUG_PACKET=true で確認すること）
 -- ============================================================
-local BUFF_PHALANX  = 53   -- ファランクス ※要実測
-local BUFF_REPRISAL = 294  -- レプリザル  ※要実測
+local BUFF_PHALANX  = 116  -- Phalanx
+local BUFF_SENTINEL = 62   -- Sentinel
+local BUFF_REPRISAL = 403  -- Reprisal
+local BUFF_CRUSADE  = 289  -- Crusade
 
 -- ============================================================
 -- ヘルパー: 指定バフIDがアクティブか確認
@@ -79,10 +85,9 @@ local function has_buff(buff_id)
     local player = AshitaCore:GetMemoryManager():GetPlayer()
     if player == nil then return false end
     local buffs = player:GetBuffs()
-    for i = 0, 31 do
-        if buffs[i] == buff_id then
-            return true
-        end
+    if buffs == nil then return false end
+    for _, v in pairs(buffs) do
+        if v == buff_id then return true end
     end
     return false
 end
@@ -159,15 +164,28 @@ local function update_buff_watch(dt)
 
     local missing = {}
     if not has_buff(BUFF_PHALANX) then
-        table.insert(missing, 'ファランクス')
+        table.insert(missing, 'Phalanx')
+    end
+    if not has_buff(BUFF_SENTINEL) then
+        table.insert(missing, 'Sentinel')
     end
     if not has_buff(BUFF_REPRISAL) then
-        table.insert(missing, 'レプリザル')
+        table.insert(missing, 'Reprisal')
     end
+    if not has_buff(BUFF_CRUSADE) then
+        table.insert(missing, 'Crusade')
+    end
+
+    -- バフ切れが新たに増えた時だけ音を鳴らす（リロード直後は除く）
+    if buff_watch_ready and #missing > prev_missing_count then
+        ashita.misc.play_sound(addon.path .. '\\sounds\\buff_off.wav')
+    end
+    prev_missing_count = #missing
+    buff_watch_ready = true
 
     if #missing > 0 then
         buff_alert.active  = true
-        buff_alert.message = table.concat(missing, ' / ') .. ' 切れ！'
+        buff_alert.message = table.concat(missing, ' / ') .. ' OFF!'
         buff_alert.timer   = 5.0
     end
 end
@@ -175,12 +193,36 @@ end
 -- ============================================================
 -- render - ImGui 描画
 -- ============================================================
-ashita.events.register('render', 'battleassist_render', function()
+ashita.events.register('d3d_present', 'battleassist_render', function()
 
     local dt = imgui.GetIO().DeltaTime
 
     -- バフ監視を更新
     update_buff_watch(dt)
+
+    -- --------------------------------------------------------
+    -- デバッグ: 現在のバフID一覧をログ出力（DEBUG_PACKET=true 時のみ、3秒ごと）
+    -- ※ バフIDが特定できたらこのブロックを削除すること
+    -- --------------------------------------------------------
+    if DEBUG_PACKET then
+        debug_buff_timer = debug_buff_timer + dt
+        if debug_buff_timer >= 3.0 then
+            debug_buff_timer = 0
+            local player = AshitaCore:GetMemoryManager():GetPlayer()
+            if player then
+                local buffs = player:GetBuffs()
+                if buffs then
+                    local buff_list = {}
+                    for _, v in pairs(buffs) do
+                        if v > 0 then
+                            table.insert(buff_list, tostring(v))
+                        end
+                    end
+                    debug_log('BUFFS: ' .. table.concat(buff_list, ','))
+                end
+            end
+        end
+    end
 
     -- --------------------------------------------------------
     -- メインHUD（バフ状態ステータス表示）
@@ -200,13 +242,11 @@ ashita.events.register('render', 'battleassist_render', function()
         if imgui.Begin('BattleAssist##hud', true, hud_flags) then
 
             -- ウィンドウ移動後に座標を保存
-            local pos = imgui.GetWindowPos()
-            cfg.x = pos.x
-            cfg.y = pos.y
+            cfg.x, cfg.y = imgui.GetWindowPos()
 
             -- タイトル
             imgui.PushStyleColor(ImGuiCol_Text, { 0.6, 0.85, 1.0, 1.0 })
-            imgui.Text('⚔ BattleAssist')
+            imgui.Text('BattleAssist')
             imgui.PopStyleColor()
 
             imgui.Separator()
@@ -215,14 +255,28 @@ ashita.events.register('render', 'battleassist_render', function()
             local ph_ok = has_buff(BUFF_PHALANX)
             imgui.PushStyleColor(ImGuiCol_Text,
                 ph_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
-            imgui.Text(ph_ok and '● ファランクス' or '○ ファランクス')
+            imgui.Text(ph_ok and '[*] Phalanx' or '[ ] Phalanx')
             imgui.PopStyleColor()
 
-            -- レプリザル状態
+            -- センチネル状態
+            local st_ok = has_buff(BUFF_SENTINEL)
+            imgui.PushStyleColor(ImGuiCol_Text,
+                st_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
+            imgui.Text(st_ok and '[*] Sentinel' or '[ ] Sentinel')
+            imgui.PopStyleColor()
+
+            -- リアクト状態
             local rp_ok = has_buff(BUFF_REPRISAL)
             imgui.PushStyleColor(ImGuiCol_Text,
                 rp_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
-            imgui.Text(rp_ok and '● レプリザル' or '○ レプリザル')
+            imgui.Text(rp_ok and '[*] Reprisal' or '[ ] Reprisal')
+            imgui.PopStyleColor()
+
+            -- クルセード状態
+            local cr_ok = has_buff(BUFF_CRUSADE)
+            imgui.PushStyleColor(ImGuiCol_Text,
+                cr_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
+            imgui.Text(cr_ok and '[*] Crusade' or '[ ] Crusade')
             imgui.PopStyleColor()
 
             -- バフ切れアラートテキスト（HUD内）
@@ -293,6 +347,14 @@ ashita.events.register('render', 'battleassist_render', function()
             imgui.End()
         end
     end
+end)
+
+-- ============================================================
+-- zone_change イベント - エリアチェンジ時はバフ監視をリセット
+-- ============================================================
+ashita.events.register('zone_change', 'battleassist_zone_change', function(e)
+    buff_watch_ready   = false
+    prev_missing_count = 0
 end)
 
 -- ============================================================
