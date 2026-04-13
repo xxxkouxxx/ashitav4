@@ -206,7 +206,7 @@ ashita.events.register('d3d_present', 'macroswitcher_present', function()
                     end
 
                     local book = { main_cfg.book }
-                    if imgui.SliderInt('Book##ms_bk_' .. main_id, book, 1, 20) then
+                    if imgui.SliderInt('Book##ms_bk_' .. main_id, book, 1, 40) then
                         main_cfg.book = book[1]; changed = true
                     end
 
@@ -234,7 +234,7 @@ ashita.events.register('d3d_present', 'macroswitcher_present', function()
                                 end
 
                                 local s_bk = { sub_cfg.book }
-                                if imgui.SliderInt('Book##ms_sbk_' .. node_id, s_bk, 1, 20) then
+                                if imgui.SliderInt('Book##ms_sbk_' .. node_id, s_bk, 1, 40) then
                                     sub_cfg.book = s_bk[1]; changed = true
                                 end
 
