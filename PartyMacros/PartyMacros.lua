@@ -54,7 +54,8 @@ local function queue_delayed(delay_sec, cmd)
         execute_at = os.clock() + delay_sec,
         command    = cmd,
     })
-    print('[PartyMacros] ' .. delay_sec .. '秒後に実行予約')
+    -- print は ASCII のみ使用（日本語 UTF-8 は Ashita で文字化け＋バイナリ混入するため）
+    print('[PartyMacros] queued in ' .. delay_sec .. 's')
 end
 
 -- ============================================================================
@@ -80,7 +81,7 @@ ashita.events.register('load', 'partymacros_load', function()
     for _, b in ipairs(binds) do
         chat:QueueCommand(1, '/bind ' .. b.key .. ' ' .. b.cmd)
     end
-    print('[PartyMacros] v' .. addon.version .. ' ロード完了。')
+    print('[PartyMacros] v' .. addon.version .. ' loaded.')
 end)
 
 ashita.events.register('unload', 'partymacros_unload', function()
