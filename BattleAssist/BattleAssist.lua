@@ -18,9 +18,10 @@ local imgui = require('imgui')
 -- 設定デフォルト値
 -- ============================================================
 local default_settings = T{
-    x       = 10,
-    y       = 10,
-    visible = true,
+    x               = 10,
+    y               = 10,
+    visible         = true,
+    disabled_skills = T{},  -- {[技ID] = true} で無効化
 }
 local cfg = T{}
 
@@ -138,7 +139,7 @@ ashita.events.register('packet_in', 'battleassist_packet_in', function(e)
             end
         end
 
-        if should_alert then
+        if should_alert and not cfg.disabled_skills[action_id] then
             alert.active  = true
             alert.message = '⚠ ' .. skill.name .. ' ！'
             alert.timer   = 5.0
@@ -251,45 +252,74 @@ ashita.events.register('d3d_present', 'battleassist_render', function()
 
             imgui.Separator()
 
-            -- ファランクス状態
-            local ph_ok = has_buff(BUFF_PHALANX)
-            imgui.PushStyleColor(ImGuiCol_Text,
-                ph_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
-            imgui.Text(ph_ok and '[*] Phalanx' or '[ ] Phalanx')
-            imgui.PopStyleColor()
+            if imgui.BeginTabBar('##ba_tabs') then
 
-            -- センチネル状態
-            local st_ok = has_buff(BUFF_SENTINEL)
-            imgui.PushStyleColor(ImGuiCol_Text,
-                st_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
-            imgui.Text(st_ok and '[*] Sentinel' or '[ ] Sentinel')
-            imgui.PopStyleColor()
+                -- ============ タブ1: バフ ============
+                if imgui.BeginTabItem('バフ') then
 
-            -- リアクト状態
-            local rp_ok = has_buff(BUFF_REPRISAL)
-            imgui.PushStyleColor(ImGuiCol_Text,
-                rp_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
-            imgui.Text(rp_ok and '[*] Reprisal' or '[ ] Reprisal')
-            imgui.PopStyleColor()
-
-            -- クルセード状態
-            local cr_ok = has_buff(BUFF_CRUSADE)
-            imgui.PushStyleColor(ImGuiCol_Text,
-                cr_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
-            imgui.Text(cr_ok and '[*] Crusade' or '[ ] Crusade')
-            imgui.PopStyleColor()
-
-            -- バフ切れアラートテキスト（HUD内）
-            if buff_alert.active then
-                buff_alert.timer = buff_alert.timer - dt
-                if buff_alert.timer <= 0 then
-                    buff_alert.active = false
-                else
-                    imgui.Separator()
-                    imgui.PushStyleColor(ImGuiCol_Text, { 1.0, 0.75, 0.0, 1.0 })
-                    imgui.Text(buff_alert.message)
+                    -- ファランクス状態
+                    local ph_ok = has_buff(BUFF_PHALANX)
+                    imgui.PushStyleColor(ImGuiCol_Text,
+                        ph_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
+                    imgui.Text(ph_ok and '[*] Phalanx' or '[ ] Phalanx')
                     imgui.PopStyleColor()
+
+                    -- センチネル状態
+                    local st_ok = has_buff(BUFF_SENTINEL)
+                    imgui.PushStyleColor(ImGuiCol_Text,
+                        st_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
+                    imgui.Text(st_ok and '[*] Sentinel' or '[ ] Sentinel')
+                    imgui.PopStyleColor()
+
+                    -- リプライザル状態
+                    local rp_ok = has_buff(BUFF_REPRISAL)
+                    imgui.PushStyleColor(ImGuiCol_Text,
+                        rp_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
+                    imgui.Text(rp_ok and '[*] Reprisal' or '[ ] Reprisal')
+                    imgui.PopStyleColor()
+
+                    -- クルセード状態
+                    local cr_ok = has_buff(BUFF_CRUSADE)
+                    imgui.PushStyleColor(ImGuiCol_Text,
+                        cr_ok and { 0.4, 1.0, 0.4, 1.0 } or { 1.0, 0.35, 0.35, 1.0 })
+                    imgui.Text(cr_ok and '[*] Crusade' or '[ ] Crusade')
+                    imgui.PopStyleColor()
+
+                    -- バフ切れアラートテキスト（HUD内）
+                    if buff_alert.active then
+                        buff_alert.timer = buff_alert.timer - dt
+                        if buff_alert.timer <= 0 then
+                            buff_alert.active = false
+                        else
+                            imgui.Separator()
+                            imgui.PushStyleColor(ImGuiCol_Text, { 1.0, 0.75, 0.0, 1.0 })
+                            imgui.Text(buff_alert.message)
+                            imgui.PopStyleColor()
+                        end
+                    end
+
+                    imgui.EndTabItem()
                 end
+
+                -- ============ タブ2: 危険技 ============
+                if imgui.BeginTabItem('危険技') then
+
+                    for id, skill in pairs(skills_def.dangerous_skills) do
+                        local enabled = not cfg.disabled_skills[id]
+                        local changed, new_val = imgui.Checkbox(skill.name, enabled)
+                        if changed then
+                            -- チェックOFF → 無効化、ON → nil（テーブルから除去）
+                            cfg.disabled_skills[id] = (not new_val) or nil
+                            settings.save()
+                        end
+                        imgui.SameLine()
+                        imgui.TextDisabled('(id:' .. id .. ')')
+                    end
+
+                    imgui.EndTabItem()
+                end
+
+                imgui.EndTabBar()
             end
         end
         imgui.End()
