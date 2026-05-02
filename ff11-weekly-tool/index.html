@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FF11 週報ツール</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── ヘッダーバー ── -->
+<header class="header-bar">
+  <span class="header-logo">VANA D'IEL LOG</span>
+  <div class="header-sep"></div>
+  <span class="header-week" id="header-week">2026 / W??</span>
+  <div class="header-actions">
+    <button class="hdr-btn" id="btn-new">新規作成</button>
+    <button class="hdr-btn" id="btn-history">過去の週報 ▾</button>
+    <button class="hdr-btn" id="btn-pdf">🖨 PDF保存</button>
+    <button class="hdr-btn primary" id="btn-save">💾 保存</button>
+  </div>
+</header>
+
+<!-- ── スプリットレイアウト ── -->
+<div class="split-layout">
+
+  <!-- ── 左：入力フォーム ── -->
+  <div class="form-panel" id="form-panel">
+
+    <!-- タイトル・総評 -->
+    <div class="form-sec">
+      <div class="form-sec-hdr">
+        <div class="form-sec-num">INFO</div>
+        <div class="form-sec-title">タイトル・総評</div>
+        <div class="form-sec-rule"></div>
+      </div>
+      <div class="form-title-area">
+        <label>タイトル（例：【えりたんFF11日記】4月第1週の活動記録と週まとめ）</label>
+        <input type="text" id="f-title" placeholder="【えりたんFF11日記】〇月 第〇週の活動記録と週まとめ">
+        <label style="margin-top:8px;">総評（1〜2行）</label>
+        <textarea id="f-summary" rows="2" placeholder="今週のハイライト・総評を1〜2行で記入…"></textarea>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="form-sec">
+      <div class="form-sec-hdr">
+        <div class="form-sec-num">01</div>
+        <div class="form-sec-title">今週の目標達成度・KPI</div>
+        <div class="form-sec-rule"></div>
+      </div>
+      <table class="form-table">
+        <thead>
+          <tr>
+            <th style="width:80px;">項目</th>
+            <th style="width:80px;">目標</th>
+            <th style="width:80px;">結果</th>
+            <th style="width:72px;">判定</th>
+            <th>備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- 0: オデシー -->
+          <tr>
+            <td><span class="row-label">オデシー</span></td>
+            <td><input type="text" id="f-kpi-goal-0" placeholder="ジェール〇層"></td>
+            <td><input type="text" id="f-kpi-result-0" placeholder="〇〇達成"></td>
+            <td>
+              <select id="f-kpi-verdict-0">
+                <option value="">—</option>
+                <option value="ok">🟢達成</option>
+                <option value="cont">🟡継続中</option>
+                <option value="ng">🔴未達</option>
+              </select>
+            </td>
+            <td><input type="text" id="f-kpi-note-0" placeholder="備考"></td>
+          </tr>
+          <!-- 1: 装備強化 -->
+          <tr>
+            <td><span class="row-label">装備強化・合成</span></td>
+            <td><input type="text" id="f-kpi-goal-1" placeholder="〇〇を+〇〇まで"></td>
+            <td><input type="text" id="f-kpi-result-1" placeholder="+〇〇達成"></td>
+            <td>
+              <select id="f-kpi-verdict-1">
+                <option value="">—</option>
+                <option value="ok">🟢達成</option>
+                <option value="cont">🟡継続中</option>
+                <option value="ng">🔴未達</option>
+              </select>
+            </td>
+            <td><input type="text" id="f-kpi-note-1" placeholder="備考"></td>
+          </tr>
+          <!-- 2: LS活動 -->
+          <tr>
+            <td><span class="row-label">フレ・LS活動</span></td>
+            <td><input type="text" id="f-kpi-goal-2" placeholder="〇〇コンテンツ同行"></td>
+            <td><input type="text" id="f-kpi-result-2" placeholder="〇〇参加"></td>
+            <td>
+              <select id="f-kpi-verdict-2">
+                <option value="">—</option>
+                <option value="ok">🟢達成</option>
+                <option value="cont">🟡継続中</option>
+                <option value="ng">🔴未達</option>
+              </select>
+            </td>
+            <td><input type="text" id="f-kpi-note-2" placeholder="備考"></td>
+          </tr>
+          <!-- 3: デイリー（固定行） -->
+          <tr class="fix-row">
+            <td><span class="row-label">デイリールーティン</span></td>
+            <td><input type="text" id="f-kpi-goal-3" value="消化"></td>
+            <td><input type="text" id="f-kpi-result-3" placeholder="〇/7日"></td>
+            <td>
+              <select id="f-kpi-verdict-3">
+                <option value="">—</option>
+                <option value="ok">🟢達成</option>
+                <option value="cont">🟡継続中</option>
+                <option value="ng">🔴未達</option>
+              </select>
+            </td>
+            <td><input type="text" id="f-kpi-note-3" placeholder="変化ある時だけ"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 稼働ログ -->
+    <div class="form-sec">
+      <div class="form-sec-hdr">
+        <div class="form-sec-num">02</div>
+        <div class="form-sec-title">稼働ログ（曜日別）</div>
+        <div class="form-sec-rule"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;">時間 / スタイル / 活動内容　※土日は時間のみ</div>
+
+      <!-- 月 -->
+      <div class="log-row">
+        <span class="log-day">月</span>
+        <input type="number" id="f-log-hours-0" placeholder="0" min="0" step="0.5">
+        <input type="text"   id="f-log-style-0" placeholder="ソロ／固定…">
+        <input type="text"   id="f-log-activity-0" placeholder="活動内容">
+      </div>
+      <!-- 火 -->
+      <div class="log-row">
+        <span class="log-day">火</span>
+        <input type="number" id="f-log-hours-1" placeholder="0" min="0" step="0.5">
+        <input type="text"   id="f-log-style-1" placeholder="ソロ／固定…">
+        <input type="text"   id="f-log-activity-1" placeholder="活動内容">
+      </div>
+      <!-- 水 -->
+      <div class="log-row">
+        <span class="log-day">水</span>
+        <input type="number" id="f-log-hours-2" placeholder="0" min="0" step="0.5">
+        <input type="text"   id="f-log-style-2" placeholder="ソロ／固定…">
+        <input type="text"   id="f-log-activity-2" placeholder="活動内容">
+      </div>
+      <!-- 木 -->
+      <div class="log-row">
+        <span class="log-day">木</span>
+        <input type="number" id="f-log-hours-3" placeholder="0" min="0" step="0.5">
+        <input type="text"   id="f-log-style-3" placeholder="ソロ／固定…">
+        <input type="text"   id="f-log-activity-3" placeholder="活動内容">
+      </div>
+      <!-- 金 -->
+      <div class="log-row">
+        <span class="log-day">金</span>
+        <input type="number" id="f-log-hours-4" placeholder="0" min="0" step="0.5">
+        <input type="text"   id="f-log-style-4" placeholder="ソロ／固定…">
+        <input type="text"   id="f-log-activity-4" placeholder="活動内容">
+      </div>
+      <!-- 土（固定） -->
+      <div class="log-row fix-row">
+        <span class="log-day" style="color:var(--text-dim);">土</span>
+        <input type="number" id="f-log-hours-5" placeholder="0" min="0" step="0.5">
+        <div class="log-fixed-label">ダイバージェンス（固定）</div>
+      </div>
+      <!-- 日（固定） -->
+      <div class="log-row fix-row">
+        <span class="log-day" style="color:var(--text-dim);">日</span>
+        <input type="number" id="f-log-hours-6" placeholder="0" min="0" step="0.5">
+        <div class="log-fixed-label">オデシー ジェール（固定）</div>
+      </div>
+    </div>
+
+    <!-- KPT -->
+    <div class="form-sec">
+      <div class="form-sec-hdr">
+        <div class="form-sec-num">03</div>
+        <div class="form-sec-title">振り返り（KPT）</div>
+        <div class="form-sec-rule"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;">内容 / アクション（→来週）</div>
+
+      <!-- Keep ×2 -->
+      <div class="kpt-form-row">
+        <div class="kpt-form-lbl"><span class="kpt-form-type k">Keep</span><span class="kpt-form-sub">良かった点①</span></div>
+        <textarea id="f-kpt-content-0" rows="2" placeholder="良かったこと・続けたいこと…"></textarea>
+        <input type="text" id="f-kpt-action-0" placeholder="→ 来週も継続">
+      </div>
+      <div class="kpt-form-row">
+        <div class="kpt-form-lbl"><span class="kpt-form-type k">Keep</span><span class="kpt-form-sub">良かった点②</span></div>
+        <textarea id="f-kpt-content-1" rows="2" placeholder="良かったこと・続けたいこと…"></textarea>
+        <input type="text" id="f-kpt-action-1" placeholder="→ 来週も継続">
+      </div>
+      <!-- Problem ×2 -->
+      <div class="kpt-form-row">
+        <div class="kpt-form-lbl"><span class="kpt-form-type p">Problem</span><span class="kpt-form-sub">反省点①</span></div>
+        <textarea id="f-kpt-content-2" rows="2" placeholder="反省・課題…"></textarea>
+        <input type="text" id="f-kpt-action-2" placeholder="→ Tryへ">
+      </div>
+      <div class="kpt-form-row">
+        <div class="kpt-form-lbl"><span class="kpt-form-type p">Problem</span><span class="kpt-form-sub">反省点②</span></div>
+        <textarea id="f-kpt-content-3" rows="2" placeholder="反省・課題…"></textarea>
+        <input type="text" id="f-kpt-action-3" placeholder="→ Tryへ">
+      </div>
+      <!-- Try ×2 -->
+      <div class="kpt-form-row">
+        <div class="kpt-form-lbl"><span class="kpt-form-type t">Try</span><span class="kpt-form-sub">来週試す①</span></div>
+        <textarea id="f-kpt-content-4" rows="2" placeholder="来週試したいこと…"></textarea>
+        <input type="text" id="f-kpt-action-4" placeholder="→ 目標に反映">
+      </div>
+      <div class="kpt-form-row">
+        <div class="kpt-form-lbl"><span class="kpt-form-type t">Try</span><span class="kpt-form-sub">来週試す②</span></div>
+        <textarea id="f-kpt-content-5" rows="2" placeholder="来週試したいこと…"></textarea>
+        <input type="text" id="f-kpt-action-5" placeholder="→ 目標に反映">
+      </div>
+    </div>
+
+    <!-- 来週の目標 -->
+    <div class="form-sec">
+      <div class="form-sec-hdr">
+        <div class="form-sec-num">NEXT</div>
+        <div class="form-sec-title">来週のメイン目標</div>
+        <div class="form-sec-rule"></div>
+      </div>
+      <div class="goal-form-row"><input type="text" id="f-goal-0" placeholder="目標①（Tryから転記）"></div>
+      <div class="goal-form-row"><input type="text" id="f-goal-1" placeholder="目標②"></div>
+      <div class="goal-form-row"><input type="text" id="f-goal-2" placeholder="目標③"></div>
+    </div>
+
+  </div><!-- /form-panel -->
+
+  <!-- ── 右：プレビュー（v2と同じ構造） ── -->
+  <div class="preview-panel">
+    <div class="preview-inner">
+
+      <!-- ヘッダー -->
+      <div class="hdr">
+        <span class="hdr-logo">VANA D'IEL LOG</span>
+        <div class="hdr-line"></div>
+        <span class="hdr-week">WEEKLY REPORT</span>
+      </div>
+
+      <!-- タイトルエリア -->
+      <div class="title-area">
+        <div class="eyebrow">Weekly Report</div>
+        <h1 class="main-title" id="pv-title">【えりたんFF11日記】〇月 第〇週の活動記録と週まとめ</h1>
+        <div class="summary-box">
+          <span id="pv-summary" class="dim">※ここに今週のハイライト・総評を1〜2行。</span>
+        </div>
+        <div class="meta-row" id="pv-meta-hours">
+          <span>⏱ 総プレイ時間：約?時間</span>
+        </div>
+      </div>
+
+      <!-- ① KPI -->
+      <div class="sec sec-kpi">
+        <div class="sec-hdr">
+          <div class="sec-num">01</div>
+          <div class="sec-title">今週の目標達成度・KPI</div>
+          <div class="sec-rule"></div>
+          <button class="sec-print-btn" data-section="kpi" title="このセクションをPDF保存">🖨</button>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="dot-var"></div>毎週記入が必要な項目</div>
+          <div class="legend-item"><div class="dot-fix"></div>固定・省略可能な項目</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>項目</th><th>目標</th><th>結果・実績</th><th>判定</th><th>備考・要因</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="var">
+              <td>オデシー<span class="diff-badge">記入</span></td>
+              <td class="write" id="pv-kpi-goal-0">—</td>
+              <td class="write" id="pv-kpi-result-0">—</td>
+              <td><span class="bdg bdg-na" id="pv-kpi-verdict-0">—</span></td>
+              <td class="write" id="pv-kpi-note-0">—</td>
+            </tr>
+            <tr class="var">
+              <td>装備強化・合成<span class="diff-badge">記入</span></td>
+              <td class="write" id="pv-kpi-goal-1">—</td>
+              <td class="write" id="pv-kpi-result-1">—</td>
+              <td><span class="bdg bdg-na" id="pv-kpi-verdict-1">—</span></td>
+              <td class="write" id="pv-kpi-note-1">—</td>
+            </tr>
+            <tr class="var">
+              <td>フレ・LS活動<span class="diff-badge">記入</span></td>
+              <td class="write" id="pv-kpi-goal-2">—</td>
+              <td class="write" id="pv-kpi-result-2">—</td>
+              <td><span class="bdg bdg-na" id="pv-kpi-verdict-2">—</span></td>
+              <td class="write" id="pv-kpi-note-2">—</td>
+            </tr>
+            <tr class="fix">
+              <td class="fix-label">デイリールーティン<span class="fix-badge">固定</span></td>
+              <td class="no-write" id="pv-kpi-goal-3">消化</td>
+              <td class="no-write" id="pv-kpi-result-3">〇/7日</td>
+              <td><span class="bdg bdg-na" id="pv-kpi-verdict-3">—</span></td>
+              <td class="no-write" id="pv-kpi-note-3">変化ある時だけ記入</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:7px;font-size:10px;color:var(--text-dim);">
+          判定コピペ用 → 🟢達成 &nbsp;/&nbsp; 🟡継続中 &nbsp;/&nbsp; 🔴未達
+        </div>
+      </div>
+
+      <!-- ② 稼働ログ -->
+      <div class="sec sec-log">
+        <div class="sec-hdr">
+          <div class="sec-num">02</div>
+          <div class="sec-title">稼働ログ（曜日別ダイジェスト）</div>
+          <div class="sec-rule"></div>
+          <button class="sec-print-btn" data-section="log" title="このセクションをPDF保存">🖨</button>
+        </div>
+        <div class="play-total">
+          <span class="lbl">今週の総プレイ時間：</span>
+          <span class="val" id="pv-total-hours">?</span>
+          <span class="unit">時間</span>
+        </div>
+        <div class="fix-notice">🔒 グレー行は固定コンテンツ。時間だけ更新すればOK</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:44px;">曜日</th>
+              <th style="width:56px;">時間</th>
+              <th style="width:88px;">スタイル</th>
+              <th>主な活動内容</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- 月〜金（変動） -->
+            <tr class="var">
+              <td style="text-align:center;font-family:'Share Tech Mono',monospace;color:var(--accent2);">月</td>
+              <td class="write" id="pv-log-hours-0">—</td>
+              <td id="pv-log-style-0"><span class="stag stag-solo">ソロ</span></td>
+              <td class="write" id="pv-log-activity-0">—</td>
+            </tr>
+            <tr class="var">
+              <td style="text-align:center;font-family:'Share Tech Mono',monospace;color:var(--accent2);">火</td>
+              <td class="write" id="pv-log-hours-1">—</td>
+              <td id="pv-log-style-1"><span class="stag stag-solo">ソロ</span></td>
+              <td class="write" id="pv-log-activity-1">—</td>
+            </tr>
+            <tr class="var">
+              <td style="text-align:center;font-family:'Share Tech Mono',monospace;color:var(--accent2);">水</td>
+              <td class="write" id="pv-log-hours-2">—</td>
+              <td id="pv-log-style-2"><span class="stag stag-solo">ソロ</span></td>
+              <td class="write" id="pv-log-activity-2">—</td>
+            </tr>
+            <tr class="var">
+              <td style="text-align:center;font-family:'Share Tech Mono',monospace;color:var(--accent2);">木</td>
+              <td class="write" id="pv-log-hours-3">—</td>
+              <td id="pv-log-style-3"><span class="stag stag-solo">ソロ</span></td>
+              <td class="write" id="pv-log-activity-3">—</td>
+            </tr>
+            <tr class="var">
+              <td style="text-align:center;font-family:'Share Tech Mono',monospace;color:var(--accent2);">金</td>
+              <td class="write" id="pv-log-hours-4">—</td>
+              <td id="pv-log-style-4"><span class="stag stag-solo">ソロ</span></td>
+              <td class="write" id="pv-log-activity-4">—</td>
+            </tr>
+            <!-- 土・日（固定） -->
+            <tr class="fix">
+              <td style="text-align:center;font-family:'Share Tech Mono',monospace;">土</td>
+              <td style="color:var(--text-muted);" id="pv-log-hours-5">—</td>
+              <td><span class="stag stag-fix">固定</span></td>
+              <td style="color:var(--text-dim);">ダイバージェンス<span class="fix-badge">固定</span></td>
+            </tr>
+            <tr class="fix">
+              <td style="text-align:center;font-family:'Share Tech Mono',monospace;">日</td>
+              <td style="color:var(--text-muted);" id="pv-log-hours-6">—</td>
+              <td><span class="stag stag-fix">固定</span></td>
+              <td style="color:var(--text-dim);">オデシー ジェール<span class="fix-badge">固定</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:7px;font-size:10px;color:var(--text-dim);">スタイル例：ソロ / 固定 / 野良</div>
+      </div>
+
+      <!-- ③ KPT -->
+      <div class="sec sec-kpt">
+        <div class="sec-hdr">
+          <div class="sec-num">03</div>
+          <div class="sec-title">今週の振り返り（KPT）</div>
+          <div class="sec-rule"></div>
+          <button class="sec-print-btn" data-section="kpt" title="このセクションをPDF保存">🖨</button>
+        </div>
+        <div class="kpt-wrap">
+          <!-- Keep ×2 -->
+          <div class="kpt-row">
+            <div class="kpt-lbl"><span class="kpt-type k">Keep</span><span class="kpt-sub">良かった点①</span></div>
+            <div class="kpt-body dim" id="pv-kpt-body-0">〇〇（良かったこと）</div>
+            <div class="kpt-act dim" id="pv-kpt-act-0"><span class="arr">→</span><span style="opacity:.4;font-style:italic;">来週も継続する施策</span></div>
+          </div>
+          <div class="kpt-row">
+            <div class="kpt-lbl"><span class="kpt-type k">Keep</span><span class="kpt-sub">良かった点②</span></div>
+            <div class="kpt-body dim" id="pv-kpt-body-1">〇〇（良かったこと）</div>
+            <div class="kpt-act dim" id="pv-kpt-act-1"><span class="arr">→</span><span style="opacity:.4;font-style:italic;">来週も継続する施策</span></div>
+          </div>
+          <!-- Problem ×2 -->
+          <div class="kpt-row">
+            <div class="kpt-lbl"><span class="kpt-type p">Problem</span><span class="kpt-sub">反省点①</span></div>
+            <div class="kpt-body dim" id="pv-kpt-body-2">〇〇（反省・課題）</div>
+            <div class="kpt-act dim" id="pv-kpt-act-2"><span class="arr">→</span>Tryへ↓</div>
+          </div>
+          <div class="kpt-row">
+            <div class="kpt-lbl"><span class="kpt-type p">Problem</span><span class="kpt-sub">反省点②</span></div>
+            <div class="kpt-body dim" id="pv-kpt-body-3">〇〇（反省・課題）</div>
+            <div class="kpt-act dim" id="pv-kpt-act-3"><span class="arr">→</span>Tryへ↓</div>
+          </div>
+          <!-- Try ×2 -->
+          <div class="kpt-row">
+            <div class="kpt-lbl"><span class="kpt-type t">Try</span><span class="kpt-sub">来週試す①</span></div>
+            <div class="kpt-body dim" id="pv-kpt-body-4">〇〇（来週試したいこと）</div>
+            <div class="kpt-act dim" id="pv-kpt-act-4"><span class="arr">→</span><span style="opacity:.4;font-style:italic;">目標設定に反映</span></div>
+          </div>
+          <div class="kpt-row">
+            <div class="kpt-lbl"><span class="kpt-type t">Try</span><span class="kpt-sub">来週試す②</span></div>
+            <div class="kpt-body dim" id="pv-kpt-body-5">〇〇（来週試したいこと）</div>
+            <div class="kpt-act dim" id="pv-kpt-act-5"><span class="arr">→</span><span style="opacity:.4;font-style:italic;">目標設定に反映</span></div>
+          </div>
+        </div>
+
+        <!-- 来週の目標 -->
+        <div class="goal-box">
+          <div class="goal-ttl">【来週のメイン目標】</div>
+          <ul class="goal-list">
+            <li class="dim" id="pv-goal-0">目標①</li>
+            <li class="dim" id="pv-goal-1">目標②</li>
+            <li class="dim" id="pv-goal-2">目標③</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- フッター -->
+      <div class="art-footer">
+        <div class="thanks">今週も遊んでくれた皆様、ありがとうございました。来週もよろしくお願いします！⚔️</div>
+        <div class="tags">
+          <span class="tag">#FF11</span>
+          <span class="tag">#FFXI</span>
+          <span class="tag">#ファイナルファンタジーXI</span>
+          <span class="tag">#週報</span>
+          <span class="tag">#オデシー</span>
+          <span class="tag">#ソーティ</span>
+          <span class="tag">#ヴァナディール</span>
+          <span class="tag">#装備合成</span>
+        </div>
+      </div>
+
+    </div><!-- /preview-inner -->
+  </div><!-- /preview-panel -->
+
+</div><!-- /split-layout -->
+
+<!-- ── コピーパネル（右下固定） ── -->
+<div class="copy-panel">
+  <div class="cp-title">TEMPLATE TOOLS</div>
+  <div class="cp-btns">
+    <button class="cp-btn" id="cp-note">✨ Note向けコピー（絵文字版）</button>
+    <button class="cp-btn" id="cp-full">📋 全文コピー（マークダウン表）</button>
+    <button class="cp-btn" id="cp-diff">⚡ 差分のみ（最速版）コピー</button>
+    <button class="cp-btn" id="cp-tags">🔖 タグ一覧コピー</button>
+  </div>
+</div>
+
+<!-- ── 過去の週報モーダル ── -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">WEEKLY ARCHIVE</div>
+    <div class="modal-list" id="modal-list"></div>
+    <div class="modal-actions">
+      <button class="modal-close-btn" id="modal-close">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script src="storage.js"></script>
+<script src="generator.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

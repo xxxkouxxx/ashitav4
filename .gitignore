@@ -13,3 +13,6 @@ Thumbs.db
 # エディタ
 *.swp
 *.bak
+
+# Claude Code の個人メモリ（ローカル環境依存）
+.claude/
