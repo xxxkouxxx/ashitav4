@@ -15,24 +15,23 @@ local settings = require('settings')
 local imgui    = require('imgui')
 
 -- ============================================================
--- Shift-JIS → UTF-8 変換（Windows API 経由）
--- FFIパケットのバイト列はSJISのため、ImGui表示前にUTF-8へ変換が必要
+-- Shift-JIS → UTF-8 変換（Windows API 経由・FFI利用可能時のみ）
 -- ============================================================
-local ffi = require('ffi')
-local ffi_ok, ffi_err = pcall(function()
-    ffi.cdef([[
-        int MultiByteToWideChar(unsigned int CodePage, unsigned long dwFlags,
-            const char* lpMultiByteStr, int cbMultiByte,
-            unsigned short* lpWideCharStr, int cchWideChar);
-        int WideCharToMultiByte(unsigned int CodePage, unsigned long dwFlags,
-            const unsigned short* lpWideCharStr, int cchWideChar,
-            char* lpMultiByteStr, int cbMultiByte,
-            const char* lpDefaultChar, int* lpUsedDefaultChar);
-    ]])
-end)
--- 多重定義エラー以外（既定義ならOK）のエラーのみ表示
-if not ffi_ok and not tostring(ffi_err):find('attempt to redefine') then
-    print('[PTChatLog] FFI警告: ' .. tostring(ffi_err))
+local ffi = nil
+pcall(function() ffi = require('ffi') end)
+
+if ffi then
+    pcall(function()
+        ffi.cdef([[
+            int MultiByteToWideChar(unsigned int CodePage, unsigned long dwFlags,
+                const char* lpMultiByteStr, int cbMultiByte,
+                unsigned short* lpWideCharStr, int cchWideChar);
+            int WideCharToMultiByte(unsigned int CodePage, unsigned long dwFlags,
+                const unsigned short* lpWideCharStr, int cchWideChar,
+                char* lpMultiByteStr, int cbMultiByte,
+                const char* lpDefaultChar, int* lpUsedDefaultChar);
+        ]])
+    end)  -- 多重定義エラーは無視
 end
 
 local CP_SJIS = 932
@@ -40,6 +39,7 @@ local CP_UTF8 = 65001
 
 local function sjis_to_utf8(str)
     if not str or str == '' then return str end
+    if not ffi then return str end  -- FFI未対応環境ではそのまま返す
     local ok, result = pcall(function()
         -- SJIS → UTF-16LE
         local wlen = ffi.C.MultiByteToWideChar(CP_SJIS, 0, str, #str, nil, 0)
@@ -53,8 +53,7 @@ local function sjis_to_utf8(str)
         ffi.C.WideCharToMultiByte(CP_UTF8, 0, wbuf, wlen, ubuf, ulen, nil, nil)
         return ffi.string(ubuf, ulen)
     end)
-    -- 変換失敗時は元の文字列をそのまま返す（文字化けでも表示は維持）
-    return ok and result or str
+    return ok and result or str  -- 失敗時は元の文字列（文字化けでも表示維持）
 end
 
 -- ============================================================
