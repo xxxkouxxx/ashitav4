@@ -19,7 +19,7 @@ local imgui    = require('imgui')
 -- FFIパケットのバイト列はSJISのため、ImGui表示前にUTF-8へ変換が必要
 -- ============================================================
 local ffi = require('ffi')
-pcall(function()
+local ffi_ok, ffi_err = pcall(function()
     ffi.cdef([[
         int MultiByteToWideChar(unsigned int CodePage, unsigned long dwFlags,
             const char* lpMultiByteStr, int cbMultiByte,
@@ -29,24 +29,32 @@ pcall(function()
             char* lpMultiByteStr, int cbMultiByte,
             const char* lpDefaultChar, int* lpUsedDefaultChar);
     ]])
-end)  -- 多重定義エラーを無視
+end)
+-- 多重定義エラー以外（既定義ならOK）のエラーのみ表示
+if not ffi_ok and not tostring(ffi_err):find('attempt to redefine') then
+    print('[PTChatLog] FFI警告: ' .. tostring(ffi_err))
+end
 
 local CP_SJIS = 932
 local CP_UTF8 = 65001
 
 local function sjis_to_utf8(str)
     if not str or str == '' then return str end
-    -- SJIS → UTF-16LE
-    local wlen = ffi.C.MultiByteToWideChar(CP_SJIS, 0, str, #str, nil, 0)
-    if wlen <= 0 then return str end
-    local wbuf = ffi.new('unsigned short[?]', wlen + 1)
-    ffi.C.MultiByteToWideChar(CP_SJIS, 0, str, #str, wbuf, wlen)
-    -- UTF-16LE → UTF-8
-    local ulen = ffi.C.WideCharToMultiByte(CP_UTF8, 0, wbuf, wlen, nil, 0, nil, nil)
-    if ulen <= 0 then return str end
-    local ubuf = ffi.new('char[?]', ulen + 1)
-    ffi.C.WideCharToMultiByte(CP_UTF8, 0, wbuf, wlen, ubuf, ulen, nil, nil)
-    return ffi.string(ubuf, ulen)
+    local ok, result = pcall(function()
+        -- SJIS → UTF-16LE
+        local wlen = ffi.C.MultiByteToWideChar(CP_SJIS, 0, str, #str, nil, 0)
+        if wlen <= 0 then return str end
+        local wbuf = ffi.new('unsigned short[?]', wlen + 1)
+        ffi.C.MultiByteToWideChar(CP_SJIS, 0, str, #str, wbuf, wlen)
+        -- UTF-16LE → UTF-8
+        local ulen = ffi.C.WideCharToMultiByte(CP_UTF8, 0, wbuf, wlen, nil, 0, nil, nil)
+        if ulen <= 0 then return str end
+        local ubuf = ffi.new('char[?]', ulen + 1)
+        ffi.C.WideCharToMultiByte(CP_UTF8, 0, wbuf, wlen, ubuf, ulen, nil, nil)
+        return ffi.string(ubuf, ulen)
+    end)
+    -- 変換失敗時は元の文字列をそのまま返す（文字化けでも表示は維持）
+    return ok and result or str
 end
 
 -- ============================================================
