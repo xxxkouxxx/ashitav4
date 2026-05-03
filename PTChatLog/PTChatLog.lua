@@ -7,12 +7,47 @@
 
 addon.name    = 'PTChatLog'
 addon.author  = '7xxxk'
-addon.version = '1.4.0'
+addon.version = '1.4.1'
 addon.desc    = 'PT/Allianceチャット + 戦闘ログ統合記録・Markdownエクスポート'
 
 require('common')
 local settings = require('settings')
 local imgui    = require('imgui')
+
+-- ============================================================
+-- Shift-JIS → UTF-8 変換（Windows API 経由）
+-- FFIパケットのバイト列はSJISのため、ImGui表示前にUTF-8へ変換が必要
+-- ============================================================
+local ffi = require('ffi')
+pcall(function()
+    ffi.cdef([[
+        int MultiByteToWideChar(unsigned int CodePage, unsigned long dwFlags,
+            const char* lpMultiByteStr, int cbMultiByte,
+            unsigned short* lpWideCharStr, int cchWideChar);
+        int WideCharToMultiByte(unsigned int CodePage, unsigned long dwFlags,
+            const unsigned short* lpWideCharStr, int cchWideChar,
+            char* lpMultiByteStr, int cbMultiByte,
+            const char* lpDefaultChar, int* lpUsedDefaultChar);
+    ]])
+end)  -- 多重定義エラーを無視
+
+local CP_SJIS = 932
+local CP_UTF8 = 65001
+
+local function sjis_to_utf8(str)
+    if not str or str == '' then return str end
+    -- SJIS → UTF-16LE
+    local wlen = ffi.C.MultiByteToWideChar(CP_SJIS, 0, str, #str, nil, 0)
+    if wlen <= 0 then return str end
+    local wbuf = ffi.new('unsigned short[?]', wlen + 1)
+    ffi.C.MultiByteToWideChar(CP_SJIS, 0, str, #str, wbuf, wlen)
+    -- UTF-16LE → UTF-8
+    local ulen = ffi.C.WideCharToMultiByte(CP_UTF8, 0, wbuf, wlen, nil, 0, nil, nil)
+    if ulen <= 0 then return str end
+    local ubuf = ffi.new('char[?]', ulen + 1)
+    ffi.C.WideCharToMultiByte(CP_UTF8, 0, wbuf, wlen, ubuf, ulen, nil, nil)
+    return ffi.string(ubuf, ulen)
+end
 
 -- ============================================================
 -- 定数
@@ -515,9 +550,9 @@ ashita.events.register('packet_in', 'ptchatlog_packet_in', function(e)
     -- offset 0x04: モードバイト（チャット種別）
     local mode    = ashita.bits.unpack_be(e.data_raw, 0x04 * 8, 8)
     -- offset 0x08-0x17: 送信者名（16バイト固定パディング、NUL終端）
-    local sender  = read_string(e.data_raw, 0x08)
+    local sender  = sjis_to_utf8(read_string(e.data_raw, 0x08))
     -- offset 0x18-: メッセージ本文（NUL終端）
-    local message = read_string(e.data_raw, 0x18)
+    local message = sjis_to_utf8(read_string(e.data_raw, 0x18))
 
     if message == '' then return end
 
