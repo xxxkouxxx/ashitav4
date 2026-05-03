@@ -73,10 +73,19 @@ gFunctions.GetBPWardRecast = function()
 end
 
 -- DRG Jump 系リキャスト（秒単位）
--- ID は要実測: /pethud abiscan を実行してログで確認してください
-local JUMP_ID       = 185;  -- 要実測
-local HIGH_JUMP_ID  = 186;  -- 要実測
-local SUPER_JUMP_ID = 194;  -- 要実測
+-- /pethud abiscan の結果より確認済み:
+--   compId=157: Ancient Circle
+--   compId=158: Jump         (使用中 32.6s → 30s リキャスト確認)
+--   compId=159: Super Jump
+--   compId=160: High Jump
+--   compId=161: Spirit Jump
+--   compId=162: Soul Jump    (使用中 29.6s → 30s リキャスト確認)
+--   compId=163: サポートジョブアビリティ（SAMメディテート等）
+local JUMP_ID         = 158;
+local HIGH_JUMP_ID    = 160;
+local SUPER_JUMP_ID   = 159;
+local SPIRIT_JUMP_ID  = 161;
+local SOUL_JUMP_ID    = 162;
 
 gFunctions.GetJumpRecast = function()
     local data = gFunctions.GetAbilityTimerData(JUMP_ID);
@@ -90,6 +99,16 @@ end
 
 gFunctions.GetSuperJumpRecast = function()
     local data = gFunctions.GetAbilityTimerData(SUPER_JUMP_ID);
+    return math.ceil(data.Recast / 60);
+end
+
+gFunctions.GetSpiritJumpRecast = function()
+    local data = gFunctions.GetAbilityTimerData(SPIRIT_JUMP_ID);
+    return math.ceil(data.Recast / 60);
+end
+
+gFunctions.GetSoulJumpRecast = function()
+    local data = gFunctions.GetAbilityTimerData(SOUL_JUMP_ID);
     return math.ceil(data.Recast / 60);
 end
 
