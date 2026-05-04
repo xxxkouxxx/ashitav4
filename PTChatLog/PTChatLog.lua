@@ -178,14 +178,14 @@ ashita.events.register('command', 'ptchatlog_command', function(e)
         debug_mode = not debug_mode
         local state = debug_mode and 'ON（全モードIDをログ出力）' or 'OFF'
         print('[PTChatLog] デバッグモード: ' .. state)
-    elseif args[2] == 'reopen' then
-        -- 手動でログファイルを再作成（ゾーン変わりなどに使用）
+    elseif args[2] == 'new' or args[2] == 'reopen' then
+        -- 新しいログファイルを作成（ボス・コンテンツ区切りに使用）
         close_log()
         open_log()
     else
         print('[PTChatLog] コマンド:')
+        print('  /ptchatlog new     新しいログファイルを作成（ボス区切り等）')
         print('  /ptchatlog debug   デバッグモード切替（モードID確認用）')
-        print('  /ptchatlog reopen  ログファイルを新規作成')
     end
 end)
 
