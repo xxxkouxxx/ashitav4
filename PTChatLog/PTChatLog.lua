@@ -6,7 +6,9 @@
 -- ImGui ウィンドウなし。パケット受信のたびに即時 flush。
 --
 -- コマンド:
---   /ptchatlog debug   デバッグモード切替（全モードIDをログ出力）
+--   /ptchatlog mark [名前]   区切り線を挿入（ボス名など）
+--   /ptchatlog new           新しいログファイルを作成
+--   /ptchatlog debug         デバッグモード切替（全モードIDをログ出力）
 -- ============================================================
 
 addon.name    = 'PTChatLog'
@@ -174,18 +176,41 @@ ashita.events.register('command', 'ptchatlog_command', function(e)
     if not args[1]:any('/ptchatlog', '/ptcl') then return end
     e.blocked = true
 
-    if args[2] == 'debug' then
+    if args[2] == 'mark' then
+        -- ボス名・区切りラベルをログに挿入
+        local label = ''
+        if #args >= 3 then
+            -- args[3] 以降を結合してラベルにする
+            local parts = {}
+            for i = 3, #args do parts[#parts + 1] = args[i] end
+            label = table.concat(parts, ' ')
+        end
+        if log_file then
+            local bar = string.rep('=', 40)
+            if label ~= '' then
+                log_file:write(string.format('\n%s\n>>> %s  [%s] <<<\n%s\n\n',
+                    bar, label, os.date('%H:%M:%S'), bar))
+            else
+                log_file:write(string.format('\n%s  [%s]\n\n', bar, os.date('%H:%M:%S')))
+            end
+            log_file:flush()
+            print('[PTChatLog] マーク追加: ' .. (label ~= '' and label or '---'))
+        else
+            print('[PTChatLog] ログファイルが開いていません。')
+        end
+
+    elseif args[2] == 'debug' then
         debug_mode = not debug_mode
         local state = debug_mode and 'ON（全モードIDをログ出力）' or 'OFF'
         print('[PTChatLog] デバッグモード: ' .. state)
     elseif args[2] == 'new' or args[2] == 'reopen' then
-        -- 新しいログファイルを作成（ボス・コンテンツ区切りに使用）
         close_log()
         open_log()
     else
         print('[PTChatLog] コマンド:')
-        print('  /ptchatlog new     新しいログファイルを作成（ボス区切り等）')
-        print('  /ptchatlog debug   デバッグモード切替（モードID確認用）')
+        print('  /ptchatlog mark [名前]   区切り線を挿入（ボス名など）')
+        print('  /ptchatlog new           新しいログファイルを作成')
+        print('  /ptchatlog debug         デバッグモード切替（モードID確認用）')
     end
 end)
 
