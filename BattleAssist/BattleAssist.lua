@@ -305,11 +305,10 @@ ashita.events.register('d3d_present', 'battleassist_render', function()
                 if imgui.BeginTabItem('危険技') then
 
                     for id, skill in pairs(skills_def.dangerous_skills) do
-                        local enabled = not cfg.disabled_skills[id]
-                        local changed, new_val = imgui.Checkbox(skill.name, enabled)
-                        if changed then
+                        local val = { not cfg.disabled_skills[id] }
+                        if imgui.Checkbox(skill.name, val) then
                             -- チェックOFF → 無効化、ON → nil（テーブルから除去）
-                            cfg.disabled_skills[id] = (not new_val) or nil
+                            cfg.disabled_skills[id] = (not val[1]) or nil
                             settings.save()
                         end
                         imgui.SameLine()
