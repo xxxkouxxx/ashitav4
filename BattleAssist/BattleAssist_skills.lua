@@ -11,12 +11,12 @@ local M = {}
 M.dangerous_skills = {
 
     -- === 即死技（Doom系） ===
-    [220]  = { name = "ドゥーム",              level = "critical", phase = "cast" },
-    [1928] = { name = "デス",                  level = "critical", phase = "cast" },
+    [220]  = { name = "Doom",            level = "critical", phase = "cast" },
+    [1928] = { name = "Death",           level = "critical", phase = "cast" },
 
     -- === ナイトが遭遇しやすいボス技 ===
-    [749]  = { name = "アブソリュートテラー",  level = "critical", phase = "cast" },
-    [1246] = { name = "テラー",                level = "critical", phase = "cast" },
+    [749]  = { name = "AbsoluteTerror",  level = "critical", phase = "cast" },
+    [1246] = { name = "Terror",          level = "critical", phase = "cast" },
 
     -- 追加する場合はここに続けて記述する
     -- [技ID] = { name = "技名", level = "critical", phase = "cast" },

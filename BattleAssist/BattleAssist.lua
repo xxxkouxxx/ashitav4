@@ -254,8 +254,8 @@ ashita.events.register('d3d_present', 'battleassist_render', function()
 
             if imgui.BeginTabBar('##ba_tabs') then
 
-                -- ============ タブ1: バフ ============
-                if imgui.BeginTabItem('バフ') then
+                -- ============ タブ1: Buffs ============
+                if imgui.BeginTabItem('Buffs') then
 
                     -- ファランクス状態
                     local ph_ok = has_buff(BUFF_PHALANX)
@@ -301,8 +301,8 @@ ashita.events.register('d3d_present', 'battleassist_render', function()
                     imgui.EndTabItem()
                 end
 
-                -- ============ タブ2: 危険技 ============
-                if imgui.BeginTabItem('危険技') then
+                -- ============ タブ2: Danger Skills ============
+                if imgui.BeginTabItem('Danger Skills') then
 
                     for id, skill in pairs(skills_def.dangerous_skills) do
                         local val = { not cfg.disabled_skills[id] }
