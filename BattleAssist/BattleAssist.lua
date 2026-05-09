@@ -233,13 +233,14 @@ ashita.events.register('d3d_present', 'battleassist_render', function()
             ImGuiWindowFlags_NoTitleBar,
             ImGuiWindowFlags_NoScrollbar,
             ImGuiWindowFlags_AlwaysAutoResize,
-            ImGuiWindowFlags_NoFocusOnAppearing
+            ImGuiWindowFlags_NoFocusOnAppearing,
+            ImGuiWindowFlags_NoNav
         )
 
         imgui.SetNextWindowPos({ cfg.x, cfg.y }, ImGuiCond_FirstUseEver)
         imgui.SetNextWindowBgAlpha(0.65)
 
-        if imgui.Begin('BattleAssist##hud', nil, hud_flags) then
+        if imgui.Begin('BattleAssist##hud', true, hud_flags) then
 
             -- ウィンドウ移動後に座標を保存
             cfg.x, cfg.y = imgui.GetWindowPos()
