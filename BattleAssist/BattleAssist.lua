@@ -233,7 +233,6 @@ ashita.events.register('d3d_present', 'battleassist_render', function()
             ImGuiWindowFlags_NoTitleBar,
             ImGuiWindowFlags_NoScrollbar,
             ImGuiWindowFlags_AlwaysAutoResize,
-            ImGuiWindowFlags_NoFocusOnAppearing,
             ImGuiWindowFlags_NoNav
         )
 
