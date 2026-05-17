@@ -301,13 +301,19 @@
       text-decoration: line-through;
       font-weight: 400;
     }
-    /* 最後のチャンス: 候補タイルをタップ可能に */
+    /* 候補タイルをタップ可能に（通常ターン: 入力値変更 / 最終ターン: 確定） */
     .c-tile.selectable {
       cursor: pointer;
     }
     .c-tile.selectable:active {
       opacity: 0.6;
       transform: scale(0.88);
+    }
+    /* ユーザーが選択した入力値（青色） */
+    .c-tile.user-selected {
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+      font-weight: 900;
     }
 
     /* Hint section */
@@ -838,6 +844,7 @@ const S = {
   excluded:     new Set(),
   history:      [],
   nextGuess:    null,
+  inputValue:   null,  // null=推奨値を使う / 数値=ユーザー指定
 };
 
 // ===================================================
@@ -886,26 +893,29 @@ function initGame(max) {
   S.excluded     = new Set();
   S.history      = [];
   S.nextGuess    = getNextGuess(S.candidates);
+  S.inputValue   = null;
   showScreen('main');
   render();
 }
 
 function applyImmediate(type) {
-  applyHint(type, { val: S.nextGuess });
+  // inputValue が設定されていればそちらを使う（バグ修正: 従来は常に nextGuess を使用）
+  applyHint(type, { val: S.inputValue ?? S.nextGuess });
 }
 
 function applyHint(type, params) {
-  const before = S.candidates.length;
-  const filter = F[type];
-  const newCands = filter(S.candidates, params);
-  const after = newCands.length;
+  const before    = S.candidates.length;
+  const actualInput = S.inputValue ?? S.nextGuess; // 実際に入力した値を記録
+  const filter    = F[type];
+  const newCands  = filter(S.candidates, params);
+  const after     = newCands.length;
 
   // 除外セット更新
   S.candidates.forEach(n => { if (!newCands.includes(n)) S.excluded.add(n); });
 
   S.history.push({
     n:        S.history.length + 1,
-    input:    S.nextGuess,
+    input:    actualInput,
     type,
     params,
     before,
@@ -915,6 +925,7 @@ function applyHint(type, params) {
   S.candidates   = newCands;
   S.attemptsLeft = S.attemptsLeft - 1;
   S.nextGuess    = getNextGuess(S.candidates);
+  S.inputValue   = null; // 次ターンは推奨値に戻す
 
   closeSheet();
 
@@ -999,7 +1010,10 @@ function render() {
   document.getElementById('s-cands').textContent    = N;
   document.getElementById('s-worst').textContent    = worst;
   document.getElementById('s-rate').textContent     = rate + '%';
-  document.getElementById('next-val').textContent   = S.nextGuess ?? '--';
+  // 表示値: ユーザー指定 > 推奨値
+  const isOverridden = S.inputValue !== null;
+  const displayVal   = S.inputValue ?? S.nextGuess;
+  document.getElementById('next-val').textContent = displayVal ?? '--';
 
   // サブテキスト
   const sub = document.getElementById('next-sub');
@@ -1009,16 +1023,21 @@ function render() {
   } else if (att === 1) {
     sub.textContent  = '最後のチャンス！';
     sub.style.color  = 'var(--warning)';
+  } else if (isOverridden) {
+    sub.textContent  = `推奨: ${S.nextGuess}`;
+    sub.style.color  = 'var(--muted)';
   } else {
     sub.textContent  = '';
     sub.style.color  = '';
   }
 
-  // 最後のチャンス時はカードのラベルと候補一覧タイトルを変更
+  // カードラベルと候補一覧タイトル
   document.getElementById('copy-hint-lbl').textContent =
-    att === 1 ? 'タップで確定' : 'タップでコピー';
+    att === 1       ? 'タップで確定'  :
+    isOverridden    ? '変更済み（タップでコピー）' : 'タップでコピー';
   document.getElementById('cand-title').textContent =
-    att === 1 ? '候補一覧（タップして確定）' : '候補一覧';
+    att === 1 ? '候補一覧（タップして確定）' :
+    att > 1   ? '候補一覧（タップして変更）' : '候補一覧';
 
   // 成功率バー
   const fill = document.getElementById('rate-fill');
@@ -1035,16 +1054,21 @@ function renderGrid() {
   const att = S.attemptsLeft;
   document.getElementById('cand-grid').innerHTML = ALL.map(n => {
     const isRec  = n === S.nextGuess;
+    const isSel  = n === S.inputValue;  // ユーザーが選択した数値
     const isExc  = S.excluded.has(n);
     let cls, onclick = '';
     if (isExc) {
       cls = 'c-tile excluded';
     } else if (att === 1) {
-      // 最後のチャンス: 候補タイルをタップして確定
+      // 最後のチャンス: タップで確定
       cls = isRec ? 'c-tile recommended selectable' : 'c-tile selectable';
       onclick = ` onclick="confirmFinalAttempt(${n})"`;
     } else {
-      cls = isRec ? 'c-tile recommended' : 'c-tile';
+      // 通常ターン: タップで入力値を変更
+      if (isSel)       cls = 'c-tile user-selected selectable';
+      else if (isRec)  cls = 'c-tile recommended selectable';
+      else             cls = 'c-tile selectable';
+      onclick = ` onclick="setInputValue(${n})"`;
     }
     return `<div class="${cls}"${onclick}>${n}</div>`;
   }).join('');
@@ -1085,11 +1109,24 @@ function fmtHint(type, p) {
 }
 
 // ===================================================
+// INPUT VALUE SELECTION
+// ===================================================
+function setInputValue(val) {
+  // 推奨値と同じタイルを再タップしたら選択解除
+  if (val === S.nextGuess || val === S.inputValue) {
+    S.inputValue = null;
+  } else {
+    S.inputValue = val;
+  }
+  render();
+}
+
+// ===================================================
 // COPY GUESS
 // ===================================================
 function onGuessClick() {
   if (S.attemptsLeft === 1) {
-    confirmFinalAttempt(S.nextGuess);
+    confirmFinalAttempt(S.inputValue ?? S.nextGuess);
   } else {
     copyGuess();
   }
@@ -1119,8 +1156,9 @@ function confirmFinalAttempt(val) {
 }
 
 function copyGuess() {
-  if (!S.nextGuess) return;
-  navigator.clipboard?.writeText(String(S.nextGuess)).catch(() => {});
+  const copyVal = S.inputValue ?? S.nextGuess;
+  if (!copyVal) return;
+  navigator.clipboard?.writeText(String(copyVal)).catch(() => {});
   const fb = document.getElementById('copy-fb');
   fb.classList.add('show');
   setTimeout(() => fb.classList.remove('show'), 1200);
