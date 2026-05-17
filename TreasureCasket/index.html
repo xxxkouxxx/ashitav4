@@ -301,6 +301,14 @@
       text-decoration: line-through;
       font-weight: 400;
     }
+    /* 最後のチャンス: 候補タイルをタップ可能に */
+    .c-tile.selectable {
+      cursor: pointer;
+    }
+    .c-tile.selectable:active {
+      opacity: 0.6;
+      transform: scale(0.88);
+    }
 
     /* Hint section */
     .hint-section { flex-shrink: 0; margin-bottom: 10px; }
@@ -527,11 +535,13 @@
 
     /* ===== FAIL SCREEN ===== */
     #screen-fail {
+      overflow-y: auto;
       justify-content: center;
       align-items: center;
       gap: 20px;
       text-align: center;
       padding: 32px 24px;
+      padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
     }
     .fail-grid {
       display: flex;
@@ -713,7 +723,7 @@
 
     <!-- 候補グリッド -->
     <div class="cand-section">
-      <div class="sec-title">候補一覧</div>
+      <div class="sec-title" id="cand-title">候補一覧</div>
       <div class="cand-grid" id="cand-grid"></div>
     </div>
 
@@ -1000,9 +1010,11 @@ function render() {
     sub.style.color  = '';
   }
 
-  // 最後のチャンス時はカードのラベルを「タップで確定」に変更
+  // 最後のチャンス時はカードのラベルと候補一覧タイトルを変更
   document.getElementById('copy-hint-lbl').textContent =
     att === 1 ? 'タップで確定' : 'タップでコピー';
+  document.getElementById('cand-title').textContent =
+    att === 1 ? '候補一覧（タップして確定）' : '候補一覧';
 
   // 成功率バー
   const fill = document.getElementById('rate-fill');
@@ -1016,12 +1028,21 @@ function render() {
 }
 
 function renderGrid() {
-  const candSet = new Set(S.candidates);
+  const att = S.attemptsLeft;
   document.getElementById('cand-grid').innerHTML = ALL.map(n => {
     const isRec  = n === S.nextGuess;
     const isExc  = S.excluded.has(n);
-    const cls    = isRec ? 'c-tile recommended' : isExc ? 'c-tile excluded' : 'c-tile';
-    return `<div class="${cls}">${n}</div>`;
+    let cls, onclick = '';
+    if (isExc) {
+      cls = 'c-tile excluded';
+    } else if (att === 1) {
+      // 最後のチャンス: 候補タイルをタップして確定
+      cls = isRec ? 'c-tile recommended selectable' : 'c-tile selectable';
+      onclick = ` onclick="confirmFinalAttempt(${n})"`;
+    } else {
+      cls = isRec ? 'c-tile recommended' : 'c-tile';
+    }
+    return `<div class="${cls}"${onclick}>${n}</div>`;
   }).join('');
 }
 
@@ -1064,15 +1085,15 @@ function fmtHint(type, p) {
 // ===================================================
 function onGuessClick() {
   if (S.attemptsLeft === 1) {
-    confirmFinalAttempt();
+    confirmFinalAttempt(S.nextGuess);
   } else {
     copyGuess();
   }
 }
 
-function confirmFinalAttempt() {
-  const val = S.nextGuess;
-  const N   = S.candidates.length;
+function confirmFinalAttempt(val) {
+  closeSheet(); // overlay 残留を防ぐ
+  const N = S.candidates.length;
 
   // 履歴に最終入力として記録
   S.history.push({
