@@ -11,6 +11,7 @@ local inPacketId = T{
     ACTION   = 0x0028,
     CHECK    = 0x0029,
     PET_SYNC = 0x0068,
+    ZONE_IN  = 0x000A,
 }
 
 -- アウトゴーイングアクションパケットのカテゴリ
@@ -162,6 +163,12 @@ end
 
 --------------------------------------------------------------------
 gPackets.packet_in_cb = function(e)
+    -- ゾーン移動: マニューバーをリセット
+    if e.id == inPacketId.ZONE_IN then
+        gConfig.params.mobInfo.pupPet.maneuvers = {};
+        return;
+    end
+
     -- Check 受信（BST Charm 用）
     if e.id == inPacketId.CHECK then
         local param1 = struct.unpack('l', e.data, 0x0C + 0x01);

@@ -14,11 +14,20 @@
 addon.name    = 'macro_export'
 addon.author  = 'macro_export'
 addon.desc    = 'マクロ・装備セット・所持アイテムをCSVにエクスポートします'
-addon.version = '1.1.0'
+addon.version = '1.2.0'
 
 require('common')
 local chat = require('chat')
 local encoding = require('encoding')
+
+-- ログイン時の自動インベントリエクスポート設定
+local auto_export = {
+    enabled      = false,
+    last_name    = nil,   -- ゾーン移動では重複エクスポートしないための制御
+    pending_name = nil,   -- エクスポート待ち中のキャラ名
+    wait_frames  = 0,     -- 残り待ちフレーム数
+    DELAY_FRAMES = 1800,  -- ゾーンイン後の固定待機フレーム数（約30秒）
+}
 
 -- 出力先ディレクトリ (Ashitaルート直下のexportフォルダ)
 local EXPORT_DIR = AshitaCore:GetInstallPath() .. 'export\\'
@@ -201,6 +210,17 @@ local function find_macro_files(user_dir)
     end
     -- 数値順ソート（dir /b はアルファベット順なので mcr10 > mcr2 になる）
     table.sort(files, function(a, b) return a.num < b.num end)
+
+    -- 番号付きブックが存在しない場合は mcr.dat（アクティブブック）にフォールバック
+    if #files == 0 then
+        local fpath = user_dir .. 'mcr.dat'
+        local tf = io.open(fpath, 'rb')
+        if tf then
+            tf:close()
+            table.insert(files, { path = fpath, label = 'p0', num = 0 })
+        end
+    end
+
     return files
 end
 
@@ -375,7 +395,8 @@ local BAG_NAMES = {
     [3]  = 'Temporary',  [4]  = 'Locker',      [5]  = 'Satchel',
     [6]  = 'Sack',       [7]  = 'Case',        [8]  = 'Wardrobe1',
     [9]  = 'Safe2',      [10] = 'Wardrobe2',   [11] = 'Wardrobe3',
-    [12] = 'Wardrobe4',  [13] = 'Wardrobe5',
+    [12] = 'Wardrobe4',  [13] = 'Wardrobe5',   [14] = 'Wardrobe6',
+    [15] = 'Wardrobe7',  [16] = 'Wardrobe8',
 }
 
 local function export_inventory(out_path)
@@ -435,6 +456,17 @@ ashita.events.register('command', 'command_cb', function(e)
     end
 
     local sub = (args[2] or 'export'):lower()
+
+    -- /me auto [on|off] : ログイン自動エクスポートのトグル
+    if sub == 'auto' then
+        e.blocked = true
+        local val = ((args[3] or 'on'):lower() ~= 'off')
+        auto_export.enabled   = val
+        auto_export.last_name = nil
+        print(chat.header(addon.name) .. 'Auto-export: ' .. (val and 'ON' or 'OFF'))
+        return
+    end
+
     if sub ~= 'export' and sub ~= 'macros' and sub ~= 'equipsets' and sub ~= 'inventory' then
         return
     end
@@ -470,4 +502,37 @@ end)
 -- ロード完了メッセージ
 ashita.events.register('load', 'load_cb', function()
     print(chat.header(addon.name) .. 'Loaded. Use /me export to start export.')
+end)
+
+-- ログイン時の自動インベントリエクスポート
+-- 0x000A = Zone Enter でエクスポート待機開始（約30秒後に実行）
+-- 確実に全バッグを取得したい場合は /me inventory を手動実行
+ashita.events.register('packet_in', 'packet_in_cb', function(e)
+    if e.id ~= 0x000A then return end
+    if not auto_export.enabled then return end
+
+    local party = AshitaCore:GetMemoryManager():GetParty()
+    local name  = party and party:GetMemberName(0)
+    if not name or name == '' then return end
+    if auto_export.last_name == name then return end
+    auto_export.last_name    = name
+    auto_export.pending_name = name
+    auto_export.wait_frames  = auto_export.DELAY_FRAMES
+    print(chat.header(addon.name) .. 'Auto-export scheduled: ' .. name .. ' (30sec)')
+end)
+
+-- フレームごとにカウントダウンし、静止後にエクスポート実行
+ashita.events.register('d3d_present', 'present_cb', function()
+    if not auto_export.pending_name then return end
+    auto_export.wait_frames = auto_export.wait_frames - 1
+    if auto_export.wait_frames > 0 then return end
+
+    local name = auto_export.pending_name
+    auto_export.pending_name = nil
+
+    ensure_dir(EXPORT_DIR)
+    local ts   = os.date('%Y%m%d_%H%M%S')
+    local path = EXPORT_DIR .. name .. '_inventory_' .. ts .. '.csv'
+    print(chat.header(addon.name) .. 'Auto-export inventory: ' .. name)
+    export_inventory(path)
 end)

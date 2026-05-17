@@ -9,7 +9,9 @@ FF11 マクロ・装備セット・所持アイテム Excel整形スクリプト
 import sys
 import os
 import io
+import re
 import glob
+import shutil
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -232,8 +234,8 @@ _STATUS_STYLE = {
     '（空）':          (COLOR['empty_gray'],  '595959'),
 }
 
-def sheet_cleanup(wb, es_rows, inv_set, es_macro_map):
-    ws = wb.create_sheet('整理チェック')
+def sheet_cleanup(wb, es_rows, inv_set, es_macro_map, sheet_name='整理チェック'):
+    ws = wb.create_sheet(sheet_name)
 
     ws.merge_cells('A1:G1')
     t = ws['A1']
@@ -467,8 +469,8 @@ def sheet_equipsets(wb, es_rows, inv_set):
 # ─────────────────────────────────────────
 # シート5: 所持アイテム一覧
 # ─────────────────────────────────────────
-def sheet_inventory(wb, inv_rows):
-    ws = wb.create_sheet('所持アイテム一覧')
+def sheet_inventory(wb, inv_rows, sheet_name='所持アイテム一覧'):
+    ws = wb.create_sheet(sheet_name)
 
     ws.merge_cells('A1:F1')
     title = ws['A1']
@@ -514,7 +516,82 @@ def find_latest_csv(pattern):
     files = glob.glob(pattern)
     return sorted(files)[-1] if files else None
 
-def main():
+def find_latest_csv_per_char(export_dir, suffix):
+    """キャラ名ごとに最新の {char}_{suffix}_YYYYMMDD_HHMMSS.csv を返す辞書"""
+    pattern = os.path.join(export_dir, f'*_{suffix}_*.csv')
+    latest  = {}
+    for path in sorted(glob.glob(pattern)):
+        m = re.match(rf'^(.+?)_{re.escape(suffix)}_\d{{8}}_\d{{6}}\.csv$',
+                     os.path.basename(path))
+        if not m:
+            continue
+        char = m.group(1)
+        if char not in latest or \
+           os.path.getmtime(path) > os.path.getmtime(latest[char]):
+            latest[char] = path
+    return latest
+
+BAG_ORDER = ['Inventory', 'Safe', 'Storage', 'Satchel', 'Sack', 'Case',
+             'Wardrobe1', 'Wardrobe2', 'Wardrobe3', 'Wardrobe4', 'Wardrobe5',
+             'Wardrobe6', 'Wardrobe7', 'Wardrobe8',
+             'Locker', 'Safe2', 'Temporary']
+
+def sheet_all_chars_summary(wb, char_data_list):
+    """全キャラのインベントリ概要シートを Workbook 先頭に挿入"""
+    ws = wb.create_sheet('全キャラサマリー', 0)
+    ws.sheet_view.showGridLines = False
+
+    cols = ['キャラ名', '合計'] + BAG_ORDER
+    total_cols = len(cols)
+
+    ws.merge_cells(f'A1:{get_column_letter(total_cols)}1')
+    t = ws['A1']
+    t.value     = 'FF11 全キャラ 所持アイテムサマリー'
+    t.fill      = fill(COLOR['header_dark'])
+    t.font      = font(bold=True, color=COLOR['text_white'], size=14)
+    t.alignment = center()
+    ws.row_dimensions[1].height = 32
+
+    write_header(ws, 2, cols, bg=COLOR['header_mid'])
+
+    ws.column_dimensions['A'].width = 18
+    ws.column_dimensions['B'].width = 8
+    for i in range(3, total_cols + 1):
+        ws.column_dimensions[get_column_letter(i)].width = 10
+
+    row_num = 3
+    totals  = {b: 0 for b in BAG_ORDER}
+    for entry in sorted(char_data_list, key=lambda x: x['char']):
+        bg     = COLOR['white'] if row_num % 2 == 1 else COLOR['gray']
+        bags   = entry['bag_counts']
+        values = [entry['char'], entry['inv_count']] + [bags.get(b, 0) for b in BAG_ORDER]
+        for col_idx, val in enumerate(values, 1):
+            cell = ws.cell(row=row_num, column=col_idx, value=val)
+            cell.fill      = fill(bg)
+            cell.font      = font(size=10, bold=(col_idx == 1))
+            cell.alignment = left() if col_idx == 1 else center()
+            cell.border    = border_thin()
+        ws.row_dimensions[row_num].height = 18
+        for b in BAG_ORDER:
+            totals[b] += bags.get(b, 0)
+        row_num += 1
+
+    # 合計行
+    total_values = ['合計', sum(entry['inv_count'] for entry in char_data_list)] \
+                 + [totals[b] for b in BAG_ORDER]
+    for col_idx, val in enumerate(total_values, 1):
+        cell = ws.cell(row=row_num, column=col_idx, value=val)
+        cell.fill      = fill(COLOR['header_light'])
+        cell.font      = font(size=10, bold=True, color=COLOR['header_dark'])
+        cell.alignment = left() if col_idx == 1 else center()
+        cell.border    = border_thin()
+    ws.row_dimensions[row_num].height = 20
+
+    ws.freeze_panes = 'A3'
+    ws.auto_filter.ref = f'A2:{get_column_letter(total_cols)}{row_num - 1}'
+
+def run_single():
+    """単一キャラ処理（既存の main() 相当、後方互換用）"""
     base = os.path.dirname(os.path.abspath(__file__))
 
     if len(sys.argv) >= 4 and not sys.argv[1].startswith('--'):
@@ -565,6 +642,97 @@ def main():
     wb.save(out_path)
     print(f'\nOK Excel出力完了: {out_path}')
     return out_path
+
+def run_multi(export_dir):
+    """複数キャラ処理: export_dir 内の最新 CSV を全キャラ分まとめて Excel 化"""
+    inv_map   = find_latest_csv_per_char(export_dir, 'inventory')
+    macro_map = find_latest_csv_per_char(export_dir, 'macros')
+    es_map_f  = find_latest_csv_per_char(export_dir, 'equipsets')
+
+    if not inv_map:
+        print(f'[エラー] {export_dir} に *_inventory_*.csv が見つかりません')
+        sys.exit(1)
+
+    print(f'[検出キャラ] {sorted(inv_map.keys())}')
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    char_data_list = []
+    used_names     = set()
+
+    for char_name in sorted(inv_map.keys()):
+        inv_path = inv_map[char_name]
+        print(f'\n--- {char_name} ---')
+        print(f'  inventory : {inv_path}')
+
+        inv_rows   = read_csv(inv_path)
+        bag_counts = {}
+        for row in inv_rows:
+            bag = row.get('バッグ', '')
+            bag_counts[bag] = bag_counts.get(bag, 0) + 1
+
+        char_data_list.append({
+            'char':       char_name,
+            'inv_count':  len(inv_rows),
+            'bag_counts': bag_counts,
+        })
+
+        # Excel シート名の衝突回避（禁止文字除去・31文字制限）
+        safe = re.sub(r'[\\/:*?"<>|\[\]]', '_', char_name)
+        base_name = safe[:27] + '_持物'
+        sheet_nm  = base_name
+        suffix_n  = 2
+        while sheet_nm in used_names:
+            sheet_nm = safe[:25] + f'_{suffix_n}_持物'
+            suffix_n += 1
+        used_names.add(sheet_nm)
+        sheet_inventory(wb, inv_rows, sheet_name=sheet_nm)
+
+        # マクロ・装備セット CSV が揃っていれば整理シートも追加
+        mp = macro_map.get(char_name)
+        ep = es_map_f.get(char_name)
+        if mp and ep:
+            print(f'  macros    : {mp}')
+            print(f'  equipsets : {ep}')
+            macro_rows   = read_csv(mp)
+            es_rows      = read_csv(ep)
+            inv_set      = build_inventory_set(inv_rows)
+            es_mac_map   = build_es_macro_map(macro_rows)
+            cln_name     = re.sub(r'[\\/:*?"<>|\[\]]', '_', char_name)[:27] + '_整理'
+            suffix_n2    = 2
+            while cln_name in used_names:
+                cln_name = re.sub(r'[\\/:*?"<>|\[\]]', '_', char_name)[:24] + f'_{suffix_n2}_整理'
+                suffix_n2 += 1
+            used_names.add(cln_name)
+            sheet_cleanup(wb, es_rows, inv_set, es_mac_map, sheet_name=cln_name)
+
+    sheet_all_chars_summary(wb, char_data_list)
+
+    out_path = os.path.join(export_dir, 'FF11_all_chars.xlsx')
+    wb.save(out_path)
+    print(f'\nOK Excel出力完了: {out_path}')
+
+    gdrive_dir = r"G:\マイドライブ\Ashitav4\export"
+    if os.path.isdir(gdrive_dir):
+        gdrive_path = os.path.join(gdrive_dir, 'FF11_all_chars.xlsx')
+        shutil.copy2(out_path, gdrive_path)
+        print(f'OK Google Drive コピー完了: {gdrive_path}')
+    else:
+        print(f'INFO Google Drive フォルダが見つからないためスキップ: {gdrive_dir}')
+
+    return out_path
+
+def main():
+    if '--multi' in sys.argv:
+        export_dir = os.path.dirname(os.path.abspath(__file__))
+        if '--dir' in sys.argv:
+            idx = sys.argv.index('--dir')
+            if idx + 1 < len(sys.argv):
+                export_dir = sys.argv[idx + 1]
+        run_multi(export_dir)
+    else:
+        run_single()
 
 if __name__ == '__main__':
     main()

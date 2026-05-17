@@ -109,6 +109,27 @@ local function read_string(data, byte_offset)
     return table.concat(result)
 end
 
+-- FFXI エスケープシーケンスを除去（SJIS変換前に必ず通す）
+-- 0x1E/0x1F + 続く1バイト = 色・書式コード → 除去しないと SJIS バイト境界がズレて文字化け
+local function strip_ffxi_escape(s)
+    if not s or s == '' then return s end
+    local result = {}
+    local i = 1
+    local len = #s
+    while i <= len do
+        local b = s:byte(i)
+        if (b == 0x1E or b == 0x1F) and i < len then
+            i = i + 2
+        elseif b < 0x20 then
+            i = i + 1
+        else
+            result[#result + 1] = s:sub(i, i)
+            i = i + 1
+        end
+    end
+    return table.concat(result)
+end
+
 -- パーティ情報文字列を生成
 local function get_party_string()
     local members = {}
@@ -218,9 +239,22 @@ ashita.events.register('packet_in', 'ptchatlog_packet_in', function(e)
     if e.id ~= PACKET_CHAT then return end
     if not log_file then return end
 
-    local mode    = ashita.bits.unpack_be(e.data_raw, 0x04 * 8, 8)
-    local sender  = sjis_to_utf8(read_string(e.data_raw, 0x08))
-    local message = sjis_to_utf8(read_string(e.data_raw, 0x18))
+    local mode       = ashita.bits.unpack_be(e.data_raw, 0x04 * 8, 8)
+    local sender_raw = read_string(e.data_raw, 0x08)
+    local msg_raw    = read_string(e.data_raw, 0x18)
+
+    -- デバッグ: メッセージ先頭16バイトの hex をログに記録（文字化け原因調査用）
+    if debug_mode and log_file and msg_raw ~= '' then
+        local hex = {}
+        for k = 1, math.min(#msg_raw, 16) do
+            hex[k] = string.format('%02X', msg_raw:byte(k))
+        end
+        log_file:write(string.format('[HEX mode=0x%02X] %s\n', mode, table.concat(hex, ' ')))
+        log_file:flush()
+    end
+
+    local sender  = sjis_to_utf8(strip_ffxi_escape(sender_raw))
+    local message = sjis_to_utf8(strip_ffxi_escape(msg_raw))
 
     if not message or message == '' then return end
 
