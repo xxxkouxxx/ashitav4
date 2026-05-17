@@ -625,21 +625,6 @@
     .rec-btn:active { opacity: 0.8; transform: scale(0.97); }
     .rec-btn.win  { background: var(--success); color: #000; }
     .rec-btn.loss { background: var(--danger);  color: #fff; }
-    .rec-btn.loss-only {
-      width: 100%;
-      max-width: 280px;
-      padding: 14px;
-      border-radius: 12px;
-      border: none;
-      background: rgba(248,81,73,0.15);
-      border: 1px solid var(--danger);
-      color: var(--danger);
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.1s;
-    }
-    .rec-btn.loss-only:active { opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -811,7 +796,11 @@
     <div class="result-badge badge-fail">残念...</div>
     <div class="result-sub" id="fail-sub"></div>
     <div class="fail-grid" id="fail-grid"></div>
-    <button class="rec-btn loss-only" onclick="recordLoss()">失敗として記録</button>
+    <div class="record-q">実際に開錠できましたか？</div>
+    <div class="record-row">
+      <button class="rec-btn win"  onclick="recordWin()">開錠成功！</button>
+      <button class="rec-btn loss" onclick="recordLoss()">失敗した</button>
+    </div>
     <button class="restart-btn" onclick="goSetup()">記録せずに戻る</button>
   </div>
 
