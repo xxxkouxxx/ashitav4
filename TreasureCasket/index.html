@@ -705,8 +705,8 @@
     <!-- 推奨値カード -->
     <div class="suggest-card">
       <div class="suggest-lbl">次に入力する数字</div>
-      <div class="suggest-val" id="next-val" onclick="copyGuess()" title="タップでコピー">--</div>
-      <div class="copy-hint">タップでコピー</div>
+      <div class="suggest-val" id="next-val" onclick="onGuessClick()" title="タップでコピー">--</div>
+      <div class="copy-hint" id="copy-hint-lbl">タップでコピー</div>
       <div class="copy-feedback" id="copy-fb">コピーしました</div>
       <div class="suggest-sub" id="next-sub"></div>
     </div>
@@ -793,7 +793,7 @@
 
   <!-- ========== FAIL ========== -->
   <div id="screen-fail" class="screen">
-    <div class="result-badge badge-fail">残念...</div>
+    <div class="result-badge badge-fail" id="fail-badge">残念...</div>
     <div class="result-sub" id="fail-sub"></div>
     <div class="fail-grid" id="fail-grid"></div>
     <div class="record-q">実際に開錠できましたか？</div>
@@ -928,8 +928,9 @@ function doSuccess() {
 
 function doFail() {
   const N = S.candidates.length;
-  document.getElementById('fail-sub').textContent = `残り候補が ${N} 個あります`;
-  document.getElementById('fail-grid').innerHTML =
+  document.getElementById('fail-badge').textContent = '残念...';
+  document.getElementById('fail-sub').textContent   = `残り候補が ${N} 個あります`;
+  document.getElementById('fail-grid').innerHTML    =
     S.candidates.map(n => `<span class="fail-tile">${n}</span>`).join('');
   showScreen('fail');
 }
@@ -999,6 +1000,10 @@ function render() {
     sub.style.color  = '';
   }
 
+  // 最後のチャンス時はカードのラベルを「タップで確定」に変更
+  document.getElementById('copy-hint-lbl').textContent =
+    att === 1 ? 'タップで確定' : 'タップでコピー';
+
   // 成功率バー
   const fill = document.getElementById('rate-fill');
   fill.style.width = rate + '%';
@@ -1049,6 +1054,7 @@ function fmtHint(type, p) {
     case 'second_multiple': return `1の位が ${p.xs.join('/')}`;
     case 'first_multiple':  return `10の位が ${p.xs.join('/')}`;
     case 'none':            return '何も分からなかった';
+    case 'final':           return '最終入力';
     default:                return type;
   }
 }
@@ -1056,6 +1062,37 @@ function fmtHint(type, p) {
 // ===================================================
 // COPY GUESS
 // ===================================================
+function onGuessClick() {
+  if (S.attemptsLeft === 1) {
+    confirmFinalAttempt();
+  } else {
+    copyGuess();
+  }
+}
+
+function confirmFinalAttempt() {
+  const val = S.nextGuess;
+  const N   = S.candidates.length;
+
+  // 履歴に最終入力として記録
+  S.history.push({
+    n:      S.history.length + 1,
+    input:  val,
+    type:   'final',
+    params: {},
+    before: N,
+    after:  N,
+  });
+  S.attemptsLeft = 0;
+
+  // FAIL 画面を「最終確認」モードで表示
+  document.getElementById('fail-badge').textContent = '最後の入力';
+  document.getElementById('fail-sub').textContent   = `${val} を入力しました — 結果を記録してください`;
+  document.getElementById('fail-grid').innerHTML    =
+    S.candidates.map(n => `<span class="fail-tile">${n}</span>`).join('');
+  showScreen('fail');
+}
+
 function copyGuess() {
   if (!S.nextGuess) return;
   navigator.clipboard?.writeText(String(S.nextGuess)).catch(() => {});
