@@ -10,6 +10,7 @@ gConfig.petType = T{
     DRAGON  = 3,
     SUMMON  = 4,
     PUPPET  = 5,
+    LUOPAN  = 6,
     UNKNOWN = -1,
 }
 

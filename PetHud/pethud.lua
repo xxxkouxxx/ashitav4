@@ -130,8 +130,12 @@ function autoDetectPetType(pet)
     local jugPet  = require('petBSTJug');
     local smnPet  = require('petSMN');
     local drgPet  = require('petDRG');
+    local geoPet  = require('petGEO');
 
-    if jugPet.checkIsJugPet(pet.Name) then
+    if geoPet.checkIsLuopan(pet.Name) then
+        gConfig.params.mobInfo.petType = gConfig.petType.LUOPAN;
+
+    elseif jugPet.checkIsJugPet(pet.Name) then
         gConfig.params.mobInfo.petType = gConfig.petType.JUG;
         jugPet.newJug();
 
@@ -142,11 +146,13 @@ function autoDetectPetType(pet)
         gConfig.params.mobInfo.petType = gConfig.petType.DRAGON;
 
     else
-        -- ジョブから PUP か BST(Charm) かを判定
+        -- ジョブから PUP / GEO / BST(Charm) かを判定
         local mainJob = AshitaCore:GetMemoryManager():GetPlayer():GetMainJob();
         local subJob  = AshitaCore:GetMemoryManager():GetPlayer():GetSubJob();
         if mainJob == 18 or subJob == 18 then  -- PUP
             gConfig.params.mobInfo.petType = gConfig.petType.PUPPET;
+        elseif mainJob == 21 or subJob == 21 then  -- GEO
+            gConfig.params.mobInfo.petType = gConfig.petType.LUOPAN;
         else
             -- BST 魅了扱い（デフォルト）
             gConfig.params.mobInfo.petType = gConfig.petType.CHARMED;

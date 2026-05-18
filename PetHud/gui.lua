@@ -12,6 +12,7 @@ local charmPet   = require('petBSTCharm');
 local jugPet     = require('petBSTJug');
 local smnPet     = require('petSMN');
 local drgPet     = require('petDRG');
+local geoPet     = require('petGEO');
 
 -- ImGuiTabItemFlags_SetSelected = 1（Ashita ImGui 定数）
 local TAB_SET_SELECTED = 1;
@@ -192,6 +193,20 @@ gui.renderMainWindow = function()
                     drgPet.gui(pet);
                 else
                     imgui.Text('No wyvern.');
+                end
+                imgui.EndTabItem();
+            end
+
+            -- [GEO] タブ
+            local geoFlag = 0;
+            if gConfig.params.mobInfo.petType == gConfig.petType.LUOPAN then
+                geoFlag = getTabFlags(gConfig.petType.LUOPAN);
+            end
+            if imgui.BeginTabItem('GEO', nil, geoFlag) then
+                if pet ~= nil then
+                    geoPet.gui(pet);
+                else
+                    imgui.Text('No luopan.');
                 end
                 imgui.EndTabItem();
             end

@@ -112,6 +112,33 @@ gFunctions.GetSoulJumpRecast = function()
     return math.ceil(data.Recast / 60);
 end
 
+-- GEO Jump 系リキャスト（秒単位）
+-- ⚠ compId は実機で /pethud abiscan を実行して確認・更新してください（暫定値）
+local FULL_CIRCLE_ID   = 175;
+local RADIAL_ARCANA_ID = 176;
+local LIFE_CYCLE_ID    = 177;
+local BOLSTER_ID       = 178;
+
+gFunctions.GetFullCircleRecast = function()
+    local data = gFunctions.GetAbilityTimerData(FULL_CIRCLE_ID);
+    return math.ceil(data.Recast / 60);
+end
+
+gFunctions.GetRadialArcanaRecast = function()
+    local data = gFunctions.GetAbilityTimerData(RADIAL_ARCANA_ID);
+    return math.ceil(data.Recast / 60);
+end
+
+gFunctions.GetLifeCycleRecast = function()
+    local data = gFunctions.GetAbilityTimerData(LIFE_CYCLE_ID);
+    return math.ceil(data.Recast / 60);
+end
+
+gFunctions.GetBolsterRecast = function()
+    local data = gFunctions.GetAbilityTimerData(BOLSTER_ID);
+    return math.ceil(data.Recast / 60);
+end
+
 -- サーバーIDからエンティティを検索（petinfo 由来）
 gFunctions.GetEntityByServerId = function(sid)
     for x = 0, 2303 do
