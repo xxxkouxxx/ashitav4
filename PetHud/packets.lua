@@ -127,6 +127,13 @@ gPackets.packet_out_cb = function(e)
         local actionId   = struct.unpack('H', e.data, 0x0C + 0x01);
 
         if category == CATEGORY_JOB_ABILITY then
+            -- デバッグ: PUP メインジョブ時の全 JA をログ出力
+            local dbgJob = AshitaCore:GetMemoryManager():GetPlayer():GetMainJob();
+            if dbgJob == 18 then
+                print(string.format('[PetHud] JA sent: actionId=0x%02X(%d) petType=%d',
+                    actionId, actionId, gConfig.params.mobInfo.petType));
+            end
+
             -- BST: ペットなし時の Charm 開始
             if gConfig.params.mobInfo.petType == gConfig.petType.NONE then
                 if actionId == abilId.CHARM then
@@ -153,9 +160,14 @@ gPackets.packet_out_cb = function(e)
             end
 
             -- PUP: Deactivate でリセット
+            -- SPアビや他のアビリティと混同しないよう、petType が PUPPET の場合のみ実行
             if actionId == abilId.DEACTIVATE then
-                gConfig.params.mobInfo.petType = gConfig.petType.NONE;
-                gConfig.params.mobInfo.pupPet.maneuvers = {};
+                print(string.format('[PetHud] DEACTIVATE検出 actionId=0x%02X petType=%d',
+                    actionId, gConfig.params.mobInfo.petType));
+                if gConfig.params.mobInfo.petType == gConfig.petType.PUPPET then
+                    gConfig.params.mobInfo.petType = gConfig.petType.NONE;
+                    gConfig.params.mobInfo.pupPet.maneuvers = {};
+                end
             end
         end
     end
