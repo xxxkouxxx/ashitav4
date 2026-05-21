@@ -39,9 +39,13 @@ local abilId = T{
     WATER_MNV   = 0x92,
     LIGHT_MNV   = 0x93,
     DARK_MNV    = 0x94,
-    -- PUP Activate / Deactivate
+    -- PUP Activate
+    -- ※ 0x89 = Activate（要実機確認）
     ACTIVATE    = 0x89,
-    DEACTIVATE  = 0x8A,
+    -- ※ 0x8A は実測で SP アビリティが使用。Deactivate の正確な ID は未確定。
+    --   アウトゴーイングパケットによる Deactivate 検出は廃止し、
+    --   ペットエンティティ消滅タイマー（pethud.lua）に委譲する。
+    SP_ABILITY  = 0x8A,  -- SPアビリティ（Deactivate と誤認していた ID）
 }
 
 -- マニューバー ID → gConfig.maneuverType のマッピング（HorizonXI 実測値）
@@ -127,13 +131,6 @@ gPackets.packet_out_cb = function(e)
         local actionId   = struct.unpack('H', e.data, 0x0C + 0x01);
 
         if category == CATEGORY_JOB_ABILITY then
-            -- デバッグ: PUP メインジョブ時の全 JA をログ出力
-            local dbgJob = AshitaCore:GetMemoryManager():GetPlayer():GetMainJob();
-            if dbgJob == 18 then
-                print(string.format('[PetHud] JA sent: actionId=0x%02X(%d) petType=%d',
-                    actionId, actionId, gConfig.params.mobInfo.petType));
-            end
-
             -- BST: ペットなし時の Charm 開始
             if gConfig.params.mobInfo.petType == gConfig.petType.NONE then
                 if actionId == abilId.CHARM then
@@ -159,16 +156,9 @@ gPackets.packet_out_cb = function(e)
                 end
             end
 
-            -- PUP: Deactivate でリセット
-            -- SPアビや他のアビリティと混同しないよう、petType が PUPPET の場合のみ実行
-            if actionId == abilId.DEACTIVATE then
-                print(string.format('[PetHud] DEACTIVATE検出 actionId=0x%02X petType=%d',
-                    actionId, gConfig.params.mobInfo.petType));
-                if gConfig.params.mobInfo.petType == gConfig.petType.PUPPET then
-                    gConfig.params.mobInfo.petType = gConfig.petType.NONE;
-                    gConfig.params.mobInfo.pupPet.maneuvers = {};
-                end
-            end
+            -- 注意: Deactivate のアウトゴーイング検出は廃止。
+            -- 0x8A は SP アビリティが使用する ID と判明したため。
+            -- 実際の Deactivate は pethud.lua のペット消滅タイマーで処理する。
         end
     end
 end

@@ -88,6 +88,12 @@ ashita.events.register('packet_out', 'packet_out_cb', function(e)
     gPackets.packet_out_cb(e);
 end);
 
+-- ペット消滅タイマー（Deactivate 判定用）
+-- SPアビ使用時はペットが一時的に消える可能性があるため、
+-- 3秒間消え続けた場合のみ本当の Deactivate として扱う
+local petGoneTimer  = nil;      -- ペット消滅を検出した os.time()
+local PET_GONE_GRACE = 3;       -- 秒: この間は Deactivate 扱いしない
+
 --------------------------------------------------------------------
 ashita.events.register('d3d_present', 'd3d_present_cb', function()
     if gConfig.hideWindow() then return; end
@@ -101,13 +107,28 @@ ashita.events.register('d3d_present', 'd3d_present_cb', function()
     -- ペットタイプの自動検出（未設定 & ペット存在時）
     local pet = GetEntity(player.PetTargetIndex);
     if pet ~= nil and pet.Name ~= nil then
+        -- ペットが存在する → 消滅タイマーをリセット
+        petGoneTimer = nil;
+
         if gConfig.params.mobInfo.petType == gConfig.petType.NONE then
             autoDetectPetType(pet);
         end
     else
-        -- ペットなし → タイプリセット
+        -- ペットなし → すぐにはリセットせず猶予タイマーで判定
         if gConfig.params.mobInfo.petType ~= gConfig.petType.NONE then
-            gConfig.params.mobInfo.petType = gConfig.petType.NONE;
+            if petGoneTimer == nil then
+                -- 消滅を初めて検出: タイマー開始
+                petGoneTimer = os.time();
+            elseif (os.time() - petGoneTimer) >= PET_GONE_GRACE then
+                -- 猶予時間を過ぎても消えていた → 本当の Deactivate
+                gConfig.params.mobInfo.petType = gConfig.petType.NONE;
+                gConfig.params.mobInfo.pupPet.maneuvers = {};
+                petGoneTimer = nil;
+            end
+            -- 猶予時間内は何もしない（SPアビ一時消滅を無視）
+        else
+            -- petType がすでに NONE なら猶予タイマー不要
+            petGoneTimer = nil;
         end
     end
 
