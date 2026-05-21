@@ -50,10 +50,12 @@ Pup.drawManeuvers = function(pup)
 
     -- 各マニューバーを横並びで表示
     for i, mnv in ipairs(list) do
-        local mName  = gConfig.maneuverName[mnv.mType] or '?';
-        local color  = gConfig.maneuverColor[mnv.mType] or { 1, 1, 1, 1 };
-        local remain = mnv.expiry - now;
-        if remain < 0 then remain = 0; end
+        local mName   = gConfig.maneuverName[mnv.mType] or '?';
+        local color   = gConfig.maneuverColor[mnv.mType] or { 1, 1, 1, 1 };
+        local remain  = mnv.expiry - now;
+        local maxDur  = gConfig.params.settings.maneuverDuration[1] or 60;
+        if remain < 0       then remain = 0;      end
+        if remain > maxDur  then remain = maxDur; end  -- サニティキャップ
 
         local label = string.format('%s(%ds)', mName, remain);
 

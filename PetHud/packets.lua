@@ -72,16 +72,19 @@ local charmTargetIdx = nil;
 
 local gPackets = T{};
 
--- マニューバーリストに追加（最大3スタック、古いものを除去）
+-- マニューバーリストに追加 / 更新
 local lastManeuverTime  = {}  -- ギアスワップアドオンによるパケット再送対策
-local MANEUVER_DEBOUNCE = 2   -- 同一タイプを2秒以内に2回検出した場合は無視
+-- ギアスワップは precast / midcast / aftercast の 3フェーズで
+-- 同じパケットを 2〜4 秒おきに複数回送ってくる場合がある。
+-- 5 秒デバウンスでそれらをまとめて弾く。
+local MANEUVER_DEBOUNCE = 5
 
 local function addManeuver(mType)
     local now      = os.time();
     -- 設定値から継続時間を取得（デフォルト 60 秒）
     local duration = gConfig.params.settings.maneuverDuration[1] or 60;
 
-    -- 同一タイプの二重登録をスキップ
+    -- 同一タイプをデバウンス内に重複検出した場合はスキップ
     if lastManeuverTime[mType] ~= nil and (now - lastManeuverTime[mType]) < MANEUVER_DEBOUNCE then
         return;
     end
@@ -89,7 +92,15 @@ local function addManeuver(mType)
 
     local list = gConfig.params.mobInfo.pupPet.maneuvers;
 
-    -- 3スタック以上は一番古いものを削除
+    -- 同一タイプが既にリストにある場合は expiry をリセット（重複追加しない）
+    for _, entry in ipairs(list) do
+        if entry.mType == mType then
+            entry.expiry = now + duration;
+            return;
+        end
+    end
+
+    -- 新規追加（3スタック以上は一番古いものを削除）
     if #list >= 3 then
         table.remove(list, 1);
     end
