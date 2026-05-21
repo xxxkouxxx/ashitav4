@@ -39,13 +39,13 @@ local abilId = T{
     WATER_MNV   = 0x92,
     LIGHT_MNV   = 0x93,
     DARK_MNV    = 0x94,
-    -- PUP Activate
-    -- ※ 0x89 = Activate（要実機確認）
-    ACTIVATE    = 0x89,
-    -- ※ 0x8A は実測で SP アビリティが使用。Deactivate の正確な ID は未確定。
-    --   アウトゴーイングパケットによる Deactivate 検出は廃止し、
-    --   ペットエンティティ消滅タイマー（pethud.lua）に委譲する。
-    SP_ABILITY  = 0x8A,  -- SPアビリティ（Deactivate と誤認していた ID）
+    -- PUP 特殊アビリティ（HorizonXI 実測値）
+    OVERDRIVE   = 0x87,  -- オーバードライブ（実測確認済み）
+    ACTIVATE    = 0x89,  -- Activate（要実機確認）
+    -- 0x8A: オーバードライブ直前に発火を確認。Repair の可能性が高い。
+    --       Deactivate（ペット解除）は パケット検出を廃止し、
+    --       ペットエンティティ消滅タイマー（pethud.lua）で判定する。
+    REPAIR_OR_DEACTIVATE = 0x8A,  -- 要実機確認（Repair or Deactivate）
 }
 
 -- マニューバー ID → gConfig.maneuverType のマッピング（HorizonXI 実測値）
