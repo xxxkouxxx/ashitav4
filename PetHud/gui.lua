@@ -46,6 +46,9 @@ gui.renderMenu = function()
         imgui.Checkbox('Show stay heal ticks (BST)',       gConfig.params.settings.components.petStayCounter);
         imgui.Checkbox('Show maneuvers (PUP)',             gConfig.params.settings.components.maneuvers);
         imgui.Checkbox('Show overload status (PUP)',       gConfig.params.settings.components.overloadStatus);
+        imgui.SliderInt('Maneuver Duration (sec)',
+            gConfig.params.settings.maneuverDuration, 60, 180);
+        imgui.ShowHelp('マニューバーの効果時間（秒）。ギア強化で延長している場合に変更。\n例: 60（素）/ 90（Strobe）/ 120（最大強化）');
 
         imgui.Separator();
         imgui.Text('Visibility');

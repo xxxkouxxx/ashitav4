@@ -73,12 +73,13 @@ local charmTargetIdx = nil;
 local gPackets = T{};
 
 -- マニューバーリストに追加（最大3スタック、古いものを除去）
-local MANEUVER_DURATION = 60  -- 秒（ギア強化があれば延長するが基本60秒）
 local lastManeuverTime  = {}  -- ギアスワップアドオンによるパケット再送対策
 local MANEUVER_DEBOUNCE = 2   -- 同一タイプを2秒以内に2回検出した場合は無視
 
 local function addManeuver(mType)
-    local now  = os.time();
+    local now      = os.time();
+    -- 設定値から継続時間を取得（デフォルト 60 秒）
+    local duration = gConfig.params.settings.maneuverDuration[1] or 60;
 
     -- 同一タイプの二重登録をスキップ
     if lastManeuverTime[mType] ~= nil and (now - lastManeuverTime[mType]) < MANEUVER_DEBOUNCE then
@@ -92,7 +93,7 @@ local function addManeuver(mType)
     if #list >= 3 then
         table.remove(list, 1);
     end
-    table.insert(list, { mType = mType, expiry = now + MANEUVER_DURATION });
+    table.insert(list, { mType = mType, expiry = now + duration });
 end
 
 -- 期限切れマニューバーを掃除

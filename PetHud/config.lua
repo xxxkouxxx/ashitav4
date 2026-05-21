@@ -74,6 +74,10 @@ local defaultConfig = T{
         hideLog         = T{false},
         alwaysVisible   = T{false},
     },
+    -- マニューバー継続時間（秒）
+    -- ギア強化で延長されている場合はここを変更する
+    -- 例: 60（素）/ 90（Strobe 装備）/ 120（最大強化）
+    maneuverDuration = T{60},
     charmUntil = T{0},
 }
 
