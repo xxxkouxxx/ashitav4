@@ -14,9 +14,10 @@ local imgui    = require('imgui');
 local settings = require('settings');
 local chat     = require('chat');
 
-local gConfig  = require('config');
-local gPackets = require('packets');
-local gGui     = require('gui');
+local gConfig     = require('config');
+local gPackets    = require('packets');
+local gGui        = require('gui');
+local gFunctions  = require('helper');
 
 local DEBUG_LOG_FILE = AshitaCore:GetInstallPath() .. 'logs\\PetHud_debug.log';
 
@@ -75,6 +76,9 @@ ashita.events.register('command', 'command_cb', function(e)
         gConfig.params.configMenuOpen[1] = not gConfig.params.configMenuOpen[1];
     elseif args[2] == 'abiscan' then
         abiscan();
+    elseif args[2] == 'buffcheck' then
+        -- バフ詳細出力（マニューバー効果時間確認用）
+        gFunctions.PrintBuffCheck();
     end
 end);
 

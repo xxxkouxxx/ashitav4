@@ -162,4 +162,31 @@ gFunctions.HasStatusEffect = function(effectId)
     if ok then return result else return false; end
 end
 
+--------------------------------------------------------------------------------
+-- バフ一覧を詳細出力（マニューバー効果時間調査用）
+-- /pethud buffcheck で呼び出す
+--------------------------------------------------------------------------------
+gFunctions.PrintBuffCheck = function()
+    local player = AshitaCore:GetMemoryManager():GetPlayer();
+    print('[PetHud] ===== Buff Check =====');
+    for i = 0, 31 do
+        local effId = 0;
+        local param  = 0;
+        local timer  = 0;
+
+        pcall(function() effId = player:GetStatusEffect(i);     end);
+        pcall(function() param = player:GetStatusEffectParam(i); end);
+        pcall(function() timer = player:GetStatusEffectTimer(i); end);
+
+        if effId ~= 0 then
+            -- timer は "秒×60" の場合があるので両方表示
+            print(string.format('[PetHud]  [%2d] id=%-4d param=%-6d timer_raw=%-8d  (%.1fs / %.1fs÷60)',
+                i, effId, param, timer,
+                timer,          -- そのまま秒の場合
+                timer / 60.0)); -- 1/60単位の場合
+        end
+    end
+    print('[PetHud] =======================');
+end
+
 return gFunctions;
