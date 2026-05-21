@@ -167,26 +167,74 @@ end
 -- /pethud buffcheck で呼び出す
 --------------------------------------------------------------------------------
 gFunctions.PrintBuffCheck = function()
+    print('[PetHud] ===== Buff Check v2 =====');
     local player = AshitaCore:GetMemoryManager():GetPlayer();
-    print('[PetHud] ===== Buff Check =====');
+    if player == nil then
+        print('[PetHud] ERROR: GetPlayer() returned nil');
+        print('[PetHud] ===========================');
+        return;
+    end
+
+    -- ① まず slot 0 だけ pcall なしでテスト → API エラーを可視化
+    local apiOk, apiErr = pcall(function()
+        local v = player:GetStatusEffect(0);
+        print(string.format('[PetHud] GetStatusEffect(0) raw = %s', tostring(v)));
+    end);
+    if not apiOk then
+        print('[PetHud] GetStatusEffect() API ERROR: ' .. tostring(apiErr));
+        -- 代替: Partyメモリ経由を試みる
+        local ok2, err2 = pcall(function()
+            local party = AshitaCore:GetMemoryManager():GetParty();
+            print('[PetHud] --- Party buff fallback ---');
+            for i = 0, 31 do
+                local bid = party:GetMemberStatusEffect(0, i);
+                if bid ~= nil and bid ~= 0 then
+                    print(string.format('[PetHud]  party[0][%2d] id=%d', i, bid));
+                end
+            end
+        end);
+        if not ok2 then
+            print('[PetHud] Party fallback ERROR: ' .. tostring(err2));
+        end
+        print('[PetHud] ===========================');
+        return;
+    end
+
+    -- ② 全スロットスキャン（id≠0 のみ表示。0 が続く場合のみ先頭4スロット強制表示）
+    local found = false;
     for i = 0, 31 do
         local effId = 0;
         local param  = 0;
         local timer  = 0;
 
-        pcall(function() effId = player:GetStatusEffect(i);     end);
-        pcall(function() param = player:GetStatusEffectParam(i); end);
-        pcall(function() timer = player:GetStatusEffectTimer(i); end);
+        local ok, err = pcall(function()
+            effId = player:GetStatusEffect(i);
+            param = player:GetStatusEffectParam(i);
+            timer = player:GetStatusEffectTimer(i);
+        end);
 
-        if effId ~= 0 then
-            -- timer は "秒×60" の場合があるので両方表示
-            print(string.format('[PetHud]  [%2d] id=%-4d param=%-6d timer_raw=%-8d  (%.1fs / %.1fs÷60)',
-                i, effId, param, timer,
-                timer,          -- そのまま秒の場合
-                timer / 60.0)); -- 1/60単位の場合
+        if not ok then
+            print(string.format('[PetHud] pcall error at i=%d : %s', i, tostring(err)));
+            break;
+        end
+
+        local showLine = (effId ~= nil and effId ~= 0);
+        if not found and i < 4 then showLine = true; end  -- 先頭4スロットは0でも強制出力
+
+        if showLine then
+            if effId ~= 0 then found = true; end
+            -- timer は 秒そのまま / 秒×60 の両方を表示
+            print(string.format('[PetHud]  [%2d] id=%-5d param=%-6d timer=%d  (as-sec=%.1f  div60=%.1f)',
+                i, effId or 0, param or 0, timer or 0,
+                (timer or 0),
+                (timer or 0) / 60.0));
         end
     end
-    print('[PetHud] =======================');
+
+    if not found then
+        print('[PetHud] (アクティブなバフなし / 全スロット 0)');
+    end
+    print('[PetHud] ===========================');
 end
 
 return gFunctions;
