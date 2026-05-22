@@ -79,13 +79,15 @@ end
 --   compId=159: Super Jump
 --   compId=160: High Jump
 --   compId=161: Spirit Jump
---   compId=162: Soul Jump    (使用中 29.6s → 30s リキャスト確認)
+--   compId=162: Spirit Link  (実機確認: スピリットリンク使用で反応 ※旧記録はSoul Jumpと誤認)
 --   compId=163: サポートジョブアビリティ（SAMメディテート等）
+-- ⚠ Soul Jump の compId は未確定。/pethud abiscan で要確認
 local JUMP_ID         = 158;
 local HIGH_JUMP_ID    = 160;
 local SUPER_JUMP_ID   = 159;
 local SPIRIT_JUMP_ID  = 161;
-local SOUL_JUMP_ID    = 162;
+local SPIRIT_LINK_ID  = 162;
+-- local SOUL_JUMP_ID = ???; -- 要 abiscan 確認
 
 gFunctions.GetJumpRecast = function()
     local data = gFunctions.GetAbilityTimerData(JUMP_ID);
@@ -107,10 +109,16 @@ gFunctions.GetSpiritJumpRecast = function()
     return math.ceil(data.Recast / 60);
 end
 
-gFunctions.GetSoulJumpRecast = function()
-    local data = gFunctions.GetAbilityTimerData(SOUL_JUMP_ID);
+gFunctions.GetSpiritLinkRecast = function()
+    local data = gFunctions.GetAbilityTimerData(SPIRIT_LINK_ID);
     return math.ceil(data.Recast / 60);
 end
+
+-- Soul Jump リキャスト（compId 未確定のため一時無効）
+-- gFunctions.GetSoulJumpRecast = function()
+--     local data = gFunctions.GetAbilityTimerData(SOUL_JUMP_ID);
+--     return math.ceil(data.Recast / 60);
+-- end
 
 -- GEO Jump 系リキャスト（秒単位）
 -- ⚠ compId は実機で /pethud abiscan を実行して確認・更新してください（暫定値）

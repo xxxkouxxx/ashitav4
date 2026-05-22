@@ -51,7 +51,7 @@ Drg.gui = function(pet)
         local highJumpSecs    = gFunctions.GetHighJumpRecast();
         local superJumpSecs   = gFunctions.GetSuperJumpRecast();
         local spiritJumpSecs  = gFunctions.GetSpiritJumpRecast();
-        local soulJumpSecs    = gFunctions.GetSoulJumpRecast();
+        local spiritLinkSecs  = gFunctions.GetSpiritLinkRecast();
 
         local function recastText(secs)
             if secs <= 0 then return 'Ready'; end
@@ -61,11 +61,12 @@ Drg.gui = function(pet)
             return string.format('%ds', secs);
         end
 
-        imgui.Text(string.format('Jump:        %s', recastText(jumpSecs)));
-        imgui.Text(string.format('High Jump:   %s', recastText(highJumpSecs)));
-        imgui.Text(string.format('Super Jump:  %s', recastText(superJumpSecs)));
-        imgui.Text(string.format('Spirit Jump: %s', recastText(spiritJumpSecs)));
-        imgui.Text(string.format('Soul Jump:   %s', recastText(soulJumpSecs)));
+        imgui.Text(string.format('Jump:         %s', recastText(jumpSecs)));
+        imgui.Text(string.format('High Jump:    %s', recastText(highJumpSecs)));
+        imgui.Text(string.format('Super Jump:   %s', recastText(superJumpSecs)));
+        imgui.Text(string.format('Spirit Jump:  %s', recastText(spiritJumpSecs)));
+        imgui.Text(string.format('Spirit Link:  %s', recastText(spiritLinkSecs)));
+        -- Soul Jump: compId 未確定のため一時非表示（/pethud abiscan で要確認）
     end
 end
 

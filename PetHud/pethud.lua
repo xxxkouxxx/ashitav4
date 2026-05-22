@@ -43,10 +43,14 @@ local function abiscan()
     end
     abiscan_log('--- ability recast scan ---');
     for i = 1, 31 do
-        local compId = ashita.memory.read_uint8(ptr + (i * 8) + 3);
-        local recast = ashita.memory.read_uint32(ptr + (i * 4) + 0xF8);
-        if compId ~= 0 then
+        local ok, compId, recast = pcall(function()
+            return ashita.memory.read_uint8(ptr + (i * 8) + 3),
+                   ashita.memory.read_uint32(ptr + (i * 4) + 0xF8);
+        end);
+        if ok and compId ~= nil and compId ~= 0 then
             abiscan_log(string.format('  slot[%d] compId=%d recast=%d (%.1fs)', i, compId, recast, recast / 60.0));
+        elseif not ok then
+            abiscan_log(string.format('  slot[%d] READ ERROR: %s', i, tostring(compId)));
         end
     end
     abiscan_log('--- scan end ---');
