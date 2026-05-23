@@ -184,6 +184,55 @@
     .btn-rec:hover { background: rgba(201,162,39,.12); }
     .disclaimer { font-size: .7rem; color: var(--dim); line-height: 1.55; }
 
+    /* ─── 番号選びサポートパネル ─── */
+    .support-panel { margin: .55rem 0 0; }
+    .support-toggle {
+      width: 100%; background: none; border: 1px solid var(--brd);
+      color: var(--dim); padding: .42rem .8rem; border-radius: 6px;
+      cursor: pointer; font-size: .82rem; text-align: left; transition: all .15s;
+    }
+    .support-toggle:hover { border-color: var(--gold); color: var(--gold); }
+    .support-body { background: var(--bg3); border: 1px solid var(--brd); border-top: none; border-radius: 0 0 6px 6px; padding: .75rem .85rem; }
+    .support-section { margin-bottom: .75rem; }
+    .support-section:last-child { margin-bottom: 0; }
+    .support-hint { font-size: .7rem; color: var(--dim); margin-left: .5rem; }
+    .btn-auto {
+      background: none; border: 1px solid var(--gold); color: var(--gold);
+      padding: .42rem 1rem; border-radius: 5px; cursor: pointer; font-size: .82rem;
+      transition: all .15s;
+    }
+    .btn-auto:hover { background: rgba(201,162,39,.12); }
+
+    /* ─── 手動ピッカー ─── */
+    .picker-row { display: flex; align-items: center; gap: .45rem; margin-bottom: .4rem; }
+    .picker-lbl { font-size: .68rem; color: var(--dim); width: 40px; flex-shrink: 0; }
+    .picker-digits { display: flex; gap: .2rem; flex-wrap: wrap; }
+    .pd-btn {
+      width: 36px; height: 36px; border-radius: 4px; border: 1px solid #2a2a44;
+      cursor: pointer; font-size: .82rem; font-weight: bold;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: all .12s; font-family: 'Courier New', monospace;
+    }
+    .pd-btn small { font-size: .5rem; font-family: sans-serif; font-weight: normal; opacity: .6; }
+    .pd-f0 { background: #111128; color: #444; }
+    .pd-f1 { background: #1e1e40; color: #9090d0; }
+    .pd-f2 { background: #3a2808; color: var(--gold); }
+    .pd-f3 { background: #6a4400; color: var(--gldt); }
+    .pd-btn.chosen { border-color: var(--gold); box-shadow: 0 0 8px rgba(201,162,39,.5); transform: scale(1.08); }
+    .pd-btn:hover:not(.chosen) { border-color: #555; }
+
+    .picker-preview-row { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; padding-top: .5rem; border-top: 1px solid var(--brd); flex-wrap: wrap; }
+    .picker-preview { font-family: 'Courier New', monospace; font-size: 1.5rem; color: var(--gold); letter-spacing: .25em; min-width: 80px; }
+    .btn-apply-pick {
+      background: var(--gold); border: none; color: #1a1200;
+      padding: .38rem .9rem; border-radius: 5px; cursor: pointer; font-size: .8rem; font-weight: bold;
+    }
+    .btn-apply-pick:disabled { opacity: .35; cursor: not-allowed; }
+    .btn-clear-pick {
+      background: none; border: 1px solid #444; color: #666;
+      padding: .35rem .7rem; border-radius: 5px; cursor: pointer; font-size: .75rem;
+    }
+
     @media (max-width: 440px) {
       .char-row { grid-template-columns: 1fr 58px 58px 28px; }
       .win-row { gap: .45rem; }
@@ -210,6 +259,28 @@
     <div class="step-body">
       <div class="char-rows" id="charList"></div>
       <button class="btn-add" onclick="addChar()">＋ キャラクターを追加</button>
+
+      <!-- 番号選びサポート（折りたたみ） -->
+      <div class="support-panel" id="supportPanel">
+        <button class="support-toggle" onclick="toggleSupport()">
+          🎯 番号選びサポート <span id="supportArrow">▼</span>
+        </button>
+        <div class="support-body" id="supportBody" style="display:none">
+          <div class="support-section">
+            <button class="btn-auto" onclick="autoFill()">✨ 傾向ランダムで自動生成</button>
+            <span class="support-hint">過去13回の出現頻度を重みにランダム選択</span>
+          </div>
+          <div class="support-section">
+            <div class="picker-rows" id="pickerRows"></div>
+            <div class="picker-preview-row">
+              <div class="picker-preview" id="pickerPreview">? ? ?</div>
+              <button class="btn-apply-pick" onclick="applyPick()" id="btnApplyPick" disabled>この番号を使う</button>
+              <button class="btn-clear-pick" onclick="clearPick()">クリア</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="btn-row">
         <button class="btn-save" onclick="exportMarkdown()">📋 Markdownで保存</button>
         <label class="btn-load" for="mdFileInput">📂 ファイルから読み込む</label>
@@ -598,6 +669,97 @@ function genRec() {
     return hot[Math.floor(Math.random() * hot.length)];
   }).join('');
   document.getElementById('recNum').textContent = rec.split('').join(' ');
+}
+
+// ── 番号選びサポート ─────────────────────────────
+
+function weightedRandom(freq) {
+  const entries = Object.entries(freq);
+  const total   = entries.reduce((s, [, v]) => s + v + 0.5, 0);
+  let r = Math.random() * total;
+  for (const [d, cnt] of entries) {
+    r -= (cnt + 0.5);
+    if (r <= 0) return d;
+  }
+  return entries[entries.length - 1][0];
+}
+
+function fillNextMarble(num) {
+  const inputs = document.querySelectorAll('.marble-input');
+  for (const inp of inputs) {
+    if (!inp.value.trim()) {
+      inp.value = num;
+      flash(inp);
+      return;
+    }
+  }
+  const last = inputs[inputs.length - 1];
+  if (last) { last.value = num; flash(last); }
+}
+
+function flash(el) {
+  el.style.transition = 'box-shadow .3s';
+  el.style.boxShadow  = '0 0 10px rgba(201,162,39,.8)';
+  setTimeout(() => { el.style.boxShadow = ''; }, 700);
+}
+
+function autoFill() {
+  const freq = digitFreq();
+  const num  = freq.map(f => weightedRandom(f)).join('');
+  fillNextMarble(num);
+}
+
+// ── 手動ピッカー ─────────────────────────────────
+
+const pickerSel = [null, null, null];
+
+function toggleSupport() {
+  const body  = document.getElementById('supportBody');
+  const arrow = document.getElementById('supportArrow');
+  const open  = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  arrow.textContent  = open ? '▼' : '▲';
+  if (!open && !document.getElementById('pickerRows').hasChildNodes()) buildPickerUI();
+}
+
+function buildPickerUI() {
+  const freq    = digitFreq();
+  const posLbls = ['百の位', '十の位', '一の位'];
+
+  document.getElementById('pickerRows').innerHTML = posLbls.map((lbl, pi) => {
+    const sorted = Object.entries(freq[pi]).sort((a, b) => b[1] - a[1] || +a[0] - +b[0]);
+    const btns = sorted.map(([d, cnt]) => {
+      const lvl = cnt === 0 ? 0 : cnt <= 1 ? 1 : cnt <= 2 ? 2 : 3;
+      return `<button class="pd-btn pd-f${lvl}" data-pos="${pi}" data-d="${d}"
+                onclick="pickDigit(${pi},'${d}')">${d}<small>${cnt}回</small></button>`;
+    }).join('');
+    return `<div class="picker-row"><span class="picker-lbl">${lbl}</span><div class="picker-digits" id="pdr${pi}">${btns}</div></div>`;
+  }).join('');
+}
+
+function pickDigit(pos, d) {
+  pickerSel[pos] = pickerSel[pos] === d ? null : d;
+  document.querySelectorAll(`#pdr${pos} .pd-btn`).forEach(b =>
+    b.classList.toggle('chosen', b.dataset.d === pickerSel[pos]));
+  updatePickerPreview();
+}
+
+function updatePickerPreview() {
+  const txt = pickerSel.map(v => v !== null ? v : '?').join(' ');
+  document.getElementById('pickerPreview').textContent = txt;
+  document.getElementById('btnApplyPick').disabled = pickerSel.every(v => v === null);
+}
+
+function applyPick() {
+  const num = pickerSel.map(v => v !== null ? v : String(Math.floor(Math.random() * 10))).join('');
+  fillNextMarble(num);
+}
+
+function clearPick() {
+  pickerSel.fill(null);
+  document.querySelectorAll('.pd-btn').forEach(b => b.classList.remove('chosen'));
+  updatePickerPreview();
+  document.getElementById('btnApplyPick').disabled = true;
 }
 
 // ── 初期化 ──────────────────────────────────────
