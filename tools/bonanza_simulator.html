@@ -349,6 +349,124 @@
       line-height: 1.5;
     }
 
+    /* ─── 傾向ピッカー ─── */
+    .picker-panel {
+      background: var(--bg2);
+      border: 1px solid #3a3a60;
+      border-radius: 8px;
+      margin: 1rem 0;
+      overflow: hidden;
+    }
+    .picker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .65rem 1rem;
+      cursor: pointer;
+      font-size: .9rem;
+      color: var(--gold);
+      user-select: none;
+      border-bottom: 1px solid transparent;
+      transition: background .15s;
+    }
+    .picker-header:hover { background: rgba(201,162,39,.07); }
+    .picker-header.open  { border-bottom-color: #2a2a44; }
+    .picker-body { display: none; padding: .9rem 1rem 1rem; }
+    .picker-body.open { display: block; }
+
+    .picker-row {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .65rem;
+      flex-wrap: wrap;
+    }
+    .picker-lbl {
+      width: 56px;
+      font-size: .75rem;
+      color: var(--text-dim);
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .picker-digits { display: flex; gap: .3rem; flex-wrap: wrap; }
+
+    .pd-btn {
+      width: 46px; height: 44px;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      background: #141428;
+      color: #aaa;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: .9rem;
+      font-weight: bold;
+      font-family: 'Courier New', monospace;
+      transition: all .14s;
+      position: relative;
+    }
+    .pd-btn .pd-cnt {
+      font-size: .58rem;
+      font-family: sans-serif;
+      font-weight: normal;
+      color: rgba(255,255,255,.45);
+      line-height: 1;
+    }
+    /* 頻度に応じた背景色 */
+    .pd-f1 { background: #1e1e40; color: #9090d0; }
+    .pd-f2 { background: #3a2808; color: var(--gold); }
+    .pd-f3 { background: #5a3c04; color: var(--gold-lt); }
+    .pd-f4 { background: #7a5000; color: #fff; }
+    /* 選択状態 */
+    .pd-btn.chosen {
+      border-color: var(--gold);
+      box-shadow: 0 0 8px rgba(201,162,39,.5);
+      transform: scale(1.08);
+    }
+    .pd-btn:hover:not(.chosen) { border-color: #555; transform: scale(1.04); }
+
+    .picker-preview {
+      display: flex;
+      align-items: center;
+      gap: .8rem;
+      margin-top: .5rem;
+      padding-top: .65rem;
+      border-top: 1px solid #2a2a44;
+      flex-wrap: wrap;
+    }
+    .preview-num {
+      font-family: 'Courier New', monospace;
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: var(--gold);
+      letter-spacing: .25em;
+      min-width: 100px;
+    }
+    .preview-num .blank { color: #333; }
+    .btn-apply {
+      padding: .45rem 1.1rem;
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: .82rem;
+      transition: all .18s;
+    }
+    .btn-apply:hover { background: rgba(201,162,39,.12); }
+    .btn-apply:disabled { opacity: .3; cursor: not-allowed; }
+    .btn-clear-pick {
+      padding: .4rem .8rem;
+      background: transparent;
+      border: 1px solid #444;
+      color: #666;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: .78rem;
+    }
+
     /* インサイトリスト */
     .insight-list { display: flex; flex-direction: column; gap: .6rem; }
     .insight-row {
@@ -404,6 +522,14 @@
     <div class="char-list" id="charList"></div>
 
     <button class="btn-add-char" onclick="addChar()">＋ キャラクターを追加</button>
+
+    <div class="picker-panel" id="pickerPanel">
+      <div class="picker-header" id="pickerHeader" onclick="togglePicker()">
+        🎯 傾向から番号を選ぶ
+        <span id="pickerArrow">▼</span>
+      </div>
+      <div class="picker-body" id="pickerBody"></div>
+    </div>
 
     <div class="draw-section">
       <button class="btn-draw" id="drawBtn" onclick="startDraw()">🎰 抽選！</button>
@@ -821,6 +947,120 @@ function genRec() {
     return hot[Math.floor(Math.random() * hot.length)];
   }).join('');
   document.getElementById('recNum').textContent = rec.split('').join(' ');
+}
+
+// ────────────────────────────────────────────
+// 傾向ピッカー
+// ────────────────────────────────────────────
+
+const pickerSel = [null, null, null]; // 選択中の桁 [百,十,一]
+
+function togglePicker() {
+  const body   = document.getElementById('pickerBody');
+  const header = document.getElementById('pickerHeader');
+  const arrow  = document.getElementById('pickerArrow');
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  header.classList.toggle('open', !isOpen);
+  arrow.textContent = isOpen ? '▼' : '▲';
+  if (!isOpen && !body.hasChildNodes()) buildPickerUI();
+}
+
+function buildPickerUI() {
+  const freq    = digitFreq();
+  const posLbls = ['百の位', '十の位', '一の位'];
+  const maxF    = Math.max(...freq.flatMap(f => Object.values(f)));
+
+  let html = '';
+  freq.forEach((f, pi) => {
+    // 頻度順にソート（同率は数字の小さい順）
+    const sorted = Object.entries(f)
+      .sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+
+    const buttons = sorted.map(([d, cnt]) => {
+      const lvl = cnt === 0 ? 0 : cnt === 1 ? 1 : cnt <= 2 ? 2 : cnt <= 3 ? 3 : 4;
+      return `<button class="pd-btn pd-f${lvl}" data-pos="${pi}" data-digit="${d}"
+                onclick="pickDigit(${pi},'${d}')">
+                ${d}<span class="pd-cnt">${cnt}回</span>
+              </button>`;
+    }).join('');
+
+    html += `<div class="picker-row">
+      <span class="picker-lbl">${posLbls[pi]}</span>
+      <div class="picker-digits" id="pdRow${pi}">${buttons}</div>
+    </div>`;
+  });
+
+  html += `<div class="picker-preview">
+    <span class="preview-num" id="prevNum">
+      <span id="pn0" class="blank">?</span>
+      <span id="pn1" class="blank">?</span>
+      <span id="pn2" class="blank">?</span>
+    </span>
+    <button class="btn-apply" id="btnApply" onclick="applyPicker()" disabled>
+      空き玉番号に適用
+    </button>
+    <button class="btn-clear-pick" onclick="clearPicker()">クリア</button>
+  </div>`;
+
+  document.getElementById('pickerBody').innerHTML = html;
+}
+
+function pickDigit(pos, digit) {
+  // 同じ桁を再クリックで解除
+  pickerSel[pos] = pickerSel[pos] === digit ? null : digit;
+
+  // ボタン選択状態更新
+  document.querySelectorAll(`#pdRow${pos} .pd-btn`).forEach(btn => {
+    btn.classList.toggle('chosen', btn.dataset.digit === pickerSel[pos]);
+  });
+
+  // プレビュー更新
+  ['pn0','pn1','pn2'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (pickerSel[i] !== null) {
+      el.textContent = pickerSel[i];
+      el.classList.remove('blank');
+    } else {
+      el.textContent = '?';
+      el.classList.add('blank');
+    }
+  });
+
+  // 適用ボタン：1桁以上選択されていれば有効
+  document.getElementById('btnApply').disabled = pickerSel.every(v => v === null);
+}
+
+function applyPicker() {
+  // 選択されていない桁はランダム
+  const num = pickerSel.map(v => v !== null ? v : String(Math.floor(Math.random() * 10))).join('');
+
+  // 最初の空き marble-input に入力
+  const inputs = document.querySelectorAll('.marble-input');
+  for (const inp of inputs) {
+    if (!inp.value.trim()) {
+      inp.value = num;
+      inp.focus();
+      inp.style.transition = 'box-shadow .3s';
+      inp.style.boxShadow  = '0 0 10px rgba(201,162,39,.8)';
+      setTimeout(() => { inp.style.boxShadow = ''; }, 800);
+      return;
+    }
+  }
+  // 全て埋まっていれば最後のに上書き
+  const last = inputs[inputs.length - 1];
+  if (last) { last.value = num; last.focus(); }
+}
+
+function clearPicker() {
+  pickerSel.fill(null);
+  document.querySelectorAll('.pd-btn').forEach(b => b.classList.remove('chosen'));
+  ['pn0','pn1','pn2'].forEach(id => {
+    const el = document.getElementById(id);
+    el.textContent = '?';
+    el.classList.add('blank');
+  });
+  document.getElementById('btnApply').disabled = true;
 }
 
 // ────────────────────────────────────────────
