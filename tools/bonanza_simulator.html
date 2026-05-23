@@ -488,6 +488,26 @@
     .insight-body { font-size: .85rem; line-height: 1.5; }
     .insight-body em { color: var(--gold); font-style: normal; }
 
+    /* ─── エクスポート ─── */
+    .export-section {
+      text-align: center;
+      margin-top: 2rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid #2a2a44;
+    }
+    .btn-export {
+      background: transparent;
+      border: 1px solid #5a7a5a;
+      color: #88bb88;
+      padding: .55rem 1.4rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .88rem;
+      transition: all .18s;
+    }
+    .btn-export:hover { background: rgba(100,180,100,.1); border-color: #88bb88; }
+    .export-hint { font-size: .72rem; color: var(--text-dim); margin-top: .4rem; }
+
     /* レスポンシブ */
     @media (max-width: 560px) {
       header h1 { font-size: 1.2rem; }
@@ -545,6 +565,11 @@
     </div>
 
     <div class="results-section" id="resultsSec"></div>
+
+    <div class="export-section">
+      <button class="btn-export" onclick="exportMarkdown()">📋 購入番号をMarkdownで保存</button>
+      <div class="export-hint">入力中のキャラ・番号を .md ファイルに書き出します</div>
+    </div>
 
   </div>
 </div>
@@ -947,6 +972,88 @@ function genRec() {
     return hot[Math.floor(Math.random() * hot.length)];
   }).join('');
   document.getElementById('recNum').textContent = rec.split('').join(' ');
+}
+
+// ────────────────────────────────────────────
+// Markdownエクスポート
+// ────────────────────────────────────────────
+
+function exportMarkdown() {
+  const now    = new Date();
+  const dateStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+  const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const fname   = `bonanza_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.md`;
+
+  // キャラ・玉データ収集
+  const chars = [];
+  document.querySelectorAll('.char-card').forEach(card => {
+    const name    = card.querySelector('.char-name-input').value.trim() || '（名前なし）';
+    const inputs  = card.querySelectorAll('.marble-input');
+    const marble1 = inputs[0]?.value.trim().padStart(3,'0') || '---';
+    const marble2 = inputs[1]?.value.trim() ? inputs[1].value.trim().padStart(3,'0') : '---';
+    chars.push({ name, marble1, marble2 });
+  });
+
+  if (chars.length === 0 || chars.every(c => c.marble1 === '---' && c.marble2 === '---')) {
+    alert('玉番号が入力されていません');
+    return;
+  }
+
+  // 傾向サマリー
+  const freq   = digitFreq();
+  const posLbl = ['百の位', '十の位', '一の位'];
+  const trendLines = freq.map((f, pi) => {
+    const max = Math.max(...Object.values(f));
+    const hot = Object.keys(f).filter(k => f[k] === max && max > 0);
+    const pct = Math.round(max / HISTORY.length * 100);
+    return `- ${posLbl[pi]}: \`${hot.join(' / ')}\` が最頻出（${max}/${HISTORY.length}回, ${pct}%）`;
+  }).join('\n');
+
+  // テーブル行
+  const tableRows = chars.map(c =>
+    `| ${c.name} | ${c.marble1 !== '---' ? `\`${c.marble1}\`` : '─'} | ${c.marble2 !== '---' ? `\`${c.marble2}\`` : '─'} |`
+  ).join('\n');
+
+  const md = `# ノマドモグボナンザ 購入記録
+
+**イベント:** 24周年記念ノマドモグボナンザ
+**販売期間:** 2026/05/14 〜 05/26
+**当選番号発表:** 2026/06/24
+**エクスポート:** ${dateStr} ${timeStr}
+
+---
+
+## 購入番号
+
+| キャラ | 玉① | 玉② |
+|--------|------|------|
+${tableRows}
+
+---
+
+## 傾向分析メモ（参考 / 全${HISTORY.length}回データ）
+
+${trendLines}
+
+> ⚠️ 傾向データはエンタメ目的です。抽選は真のランダムであり予測はできません。
+
+---
+
+## 過去の当選番号
+
+| 回 | 1等（全3桁） | 2等（下2桁） | 3等（下1桁） |
+|----|------------|------------|------------|
+${HISTORY.map(h => `| ${h.year} | \`${h.first}\` | ${h.second} | ${h.third} |`).join('\n')}
+`;
+
+  // ダウンロード
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = fname;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ────────────────────────────────────────────
