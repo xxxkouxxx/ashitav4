@@ -349,6 +349,27 @@
       line-height: 1.5;
     }
 
+    /* インサイトリスト */
+    .insight-list { display: flex; flex-direction: column; gap: .6rem; }
+    .insight-row {
+      display: flex;
+      gap: .8rem;
+      align-items: baseline;
+      background: #111128;
+      border: 1px solid #2a2a44;
+      border-radius: 6px;
+      padding: .6rem .85rem;
+    }
+    .insight-pos {
+      font-size: .72rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+      width: 74px;
+      flex-shrink: 0;
+    }
+    .insight-body { font-size: .85rem; line-height: 1.5; }
+    .insight-body em { color: var(--gold); font-style: normal; }
+
     /* レスポンシブ */
     @media (max-width: 560px) {
       header h1 { font-size: 1.2rem; }
@@ -456,10 +477,19 @@ const TIER_NAME  = { 1:'1等', 2:'2等', 3:'3等', 4:'4等（ハズレ）' };
 const TIER_CLASS = { 1:'tier-1', 2:'tier-2', 3:'tier-3', 4:'tier-4' };
 
 const HISTORY = [
-  { year:'19周年', first:'596', second:'22', third:'4' },
-  { year:'21周年', first:'800', second:'71', third:'7' },
-  { year:'22周年', first:'789', second:'77', third:'4' },
-  { year:'23周年', first:'508', second:'08', third:'0' },
+  { year:'第3回 新春2021',  first:'397', second:'79', third:'1' },
+  { year:'第4回 早春2021',  first:'196', second:'37', third:'0' },
+  { year:'第5回 19周年',    first:'596', second:'22', third:'4' },
+  { year:'第6回 真夏2021',  first:'230', second:'44', third:'7' },
+  { year:'第7回 新春2022',  first:'032', second:'88', third:'1' },
+  { year:'第8回 20周年',    first:'854', second:'04', third:'7' },
+  { year:'第9回 新春2023',  first:'109', second:'62', third:'9' },
+  { year:'第10回 21周年',   first:'800', second:'71', third:'7' },
+  { year:'第11回 新春2024', first:'594', second:'39', third:'5' },
+  { year:'第12回 22周年',   first:'789', second:'77', third:'4' },
+  { year:'第13回 新春2025', first:'635', second:'27', third:'1' },
+  { year:'第14回 23周年',   first:'508', second:'08', third:'0' },
+  { year:'第15回 新春2026', first:'021', second:'50', third:'9' },
 ];
 
 // ────────────────────────────────────────────
@@ -679,6 +709,69 @@ function buildTrend() {
     </div>`;
   }).join('');
 
+  // ── インサイト生成 ──
+  const n = HISTORY.length;
+  const insightItems = [];
+
+  // 各桁でトップの数字と出現率を調べてコメント化
+  freq.forEach((f, pi) => {
+    const max  = Math.max(...Object.values(f));
+    const hot  = Object.keys(f).filter(k => f[k] === max);
+    const pct  = Math.round(max / n * 100);
+    const lbl  = ['百の位','十の位','一の位'][pi];
+    const theory = 10;
+    if (max >= 2) {
+      const ratio = (pct / theory).toFixed(1);
+      insightItems.push(
+        `<div class="insight-row">
+          <span class="insight-pos">${lbl}</span>
+          <span class="insight-body">
+            <strong style="color:var(--gold-lt)">${hot.join(' / ')}</strong> が
+            ${max}/${n}回 <em>(${pct}%)</em> 出現 ─ 理論値(10%)の約${ratio}倍
+          </span>
+        </div>`
+      );
+    }
+  });
+
+  // 百の位+十の位の組み合わせトップ
+  const combos = {};
+  HISTORY.forEach(h => {
+    const k = h.first.padStart(3,'0').slice(0,2);
+    combos[k] = (combos[k] || 0) + 1;
+  });
+  const topCombo = Object.entries(combos).sort((a,b) => b[1]-a[1])[0];
+  if (topCombo[1] >= 2) {
+    insightItems.push(
+      `<div class="insight-row">
+        <span class="insight-pos">上2桁</span>
+        <span class="insight-body">
+          <strong style="color:var(--gold-lt)">${topCombo[0]}X</strong> が
+          ${topCombo[1]}/${n}回出現（${Math.round(topCombo[1]/n*100)}%）─ 最多の上2桁パターン
+        </span>
+      </div>`
+    );
+  }
+
+  // 3等一の位
+  const thirdFreq = {};
+  for (let d=0; d<=9; d++) thirdFreq[d] = 0;
+  HISTORY.forEach(h => { const d = h.third.slice(-1); thirdFreq[d]++; });
+  const thirdMax  = Math.max(...Object.values(thirdFreq));
+  const thirdHot  = Object.keys(thirdFreq).filter(k => thirdFreq[k] === thirdMax);
+  insightItems.push(
+    `<div class="insight-row">
+      <span class="insight-pos">3等(一の位)</span>
+      <span class="insight-body">
+        <strong style="color:var(--bronze)">${thirdHot.join(' / ')}</strong> が各${thirdMax}回出現
+        ─ 下1桁が一致すると3等。一の位選択の参考に
+      </span>
+    </div>`
+  );
+
+  const insightHtml = `
+    <div class="insight-list">${insightItems.join('')}</div>`;
+
   document.getElementById('trendBody').innerHTML = `
     <div class="trend-section">
       <h2>📋 過去の当選番号（参考）</h2>
@@ -692,13 +785,18 @@ function buildTrend() {
       <h2>🌡 桁別出現頻度ヒートマップ（1等 全${HISTORY.length}回）</h2>
       <div class="heatmap">${hmRows}</div>
       <div style="font-size:.72rem;color:var(--text-dim);margin-top:.5rem">
-        🟣 薄紫=1回出現　🟠 オレンジ=2回出現（最頻）
+        🟣 薄紫=1回出現　🟠 オレンジ=最頻出
       </div>
     </div>
 
     <div class="trend-section">
       <h2>🔥 ホット / ❄ コールド数字</h2>
       ${hcHtml}
+    </div>
+
+    <div class="trend-section">
+      <h2>💡 注目インサイト（全${HISTORY.length}回 分析）</h2>
+      ${insightHtml}
     </div>
 
     <div class="trend-section">
@@ -710,7 +808,7 @@ function buildTrend() {
       </div>
       <div class="disclaimer">
         ⚠️ このデータはエンタメ目的です。ボナンザの抽選は真のランダムであり、過去の当選番号は次回の結果に一切影響しません。
-        4回分のサンプルでは統計的な有意性はほぼありません。あくまでも参考程度にお楽しみください。
+        ${HISTORY.length}回分のサンプルでも真のランダム抽選に対して統計的有意性はありません。あくまでも参考程度にお楽しみください。
       </div>
     </div>`;
 }
