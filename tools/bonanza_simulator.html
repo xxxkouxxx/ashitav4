@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ノマドモグボナンザ 抽選シミュレーター</title>
+  <style>
+    :root {
+      --bg:        #0d0d1a;
+      --bg2:       #1a1a30;
+      --gold:      #c9a227;
+      --gold-lt:   #f0d060;
+      --silver:    #a0a8c0;
+      --bronze:    #cd7f32;
+      --text:      #e8e0d0;
+      --text-dim:  #777;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ─── ヘッダー ─── */
+    header {
+      text-align: center;
+      padding: 1.8rem 1rem 1.2rem;
+      background: linear-gradient(180deg, #070712 0%, #1a1a30 100%);
+      border-bottom: 2px solid var(--gold);
+    }
+    header h1 {
+      font-size: 1.7rem;
+      color: var(--gold);
+      text-shadow: 0 0 24px rgba(201,162,39,.55);
+      letter-spacing: .08em;
+    }
+    header p { color: var(--text-dim); font-size: .82rem; margin-top: .3rem; }
+
+    /* ─── タブ ─── */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: .5rem;
+      padding: .9rem 1rem;
+      background: var(--bg2);
+      border-bottom: 1px solid #2a2a44;
+    }
+    .tab-btn {
+      padding: .55rem 1.4rem;
+      border: 1px solid var(--gold);
+      background: transparent;
+      color: var(--gold);
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: .88rem;
+      transition: all .18s;
+    }
+    .tab-btn.active { background: var(--gold); color: #1a0a00; font-weight: bold; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .container { max-width: 860px; margin: 0 auto; padding: 1.4rem 1rem; }
+
+    /* ─── 情報バー ─── */
+    .info-bar {
+      background: #111128;
+      border: 1px solid #2a2a44;
+      border-radius: 6px;
+      padding: .55rem 1rem;
+      margin-bottom: 1.2rem;
+      font-size: .78rem;
+      color: var(--text-dim);
+      display: flex;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+    }
+    .info-bar strong { color: var(--text); }
+
+    /* ─── キャラカード ─── */
+    .char-list { display: flex; flex-direction: column; gap: .9rem; margin-bottom: 1.2rem; }
+
+    .char-card {
+      background: var(--bg2);
+      border: 1px solid #2e2e50;
+      border-radius: 8px;
+      padding: .9rem;
+    }
+    .char-header {
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      margin-bottom: .75rem;
+    }
+    .char-name-input {
+      background: #111128;
+      border: 1px solid #3a3a60;
+      color: var(--text);
+      padding: .38rem .6rem;
+      border-radius: 4px;
+      font-size: .88rem;
+      flex: 1;
+    }
+    .marbles-row { display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
+    .marble-group { display: flex; align-items: center; gap: .45rem; }
+    .marble-label { font-size: .75rem; color: var(--text-dim); white-space: nowrap; }
+    .marble-input {
+      background: #111128;
+      border: 2px solid var(--gold);
+      color: var(--gold-lt);
+      padding: .38rem .55rem;
+      border-radius: 5px;
+      font-size: 1.15rem;
+      font-weight: bold;
+      width: 78px;
+      text-align: center;
+      letter-spacing: .18em;
+      font-family: 'Courier New', monospace;
+    }
+    .marble-input::placeholder { color: #444; letter-spacing: .05em; }
+
+    .btn-remove {
+      background: #3a0000;
+      border: 1px solid #660000;
+      color: #ff7070;
+      padding: .28rem .55rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: .75rem;
+    }
+    .btn-add-char {
+      background: transparent;
+      border: 1px dashed var(--gold);
+      color: var(--gold);
+      padding: .55rem 1.2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .88rem;
+      width: 100%;
+      transition: all .2s;
+    }
+    .btn-add-char:hover { background: rgba(201,162,39,.08); }
+
+    /* ─── 抽選ボタン ─── */
+    .draw-section { text-align: center; margin: 1.6rem 0; }
+    .btn-draw {
+      background: linear-gradient(135deg, #a07010, #c9a227, #daa520, #c9a227, #a07010);
+      border: none;
+      color: #1a0800;
+      padding: .95rem 3rem;
+      font-size: 1.35rem;
+      font-weight: bold;
+      border-radius: 50px;
+      cursor: pointer;
+      letter-spacing: .1em;
+      box-shadow: 0 4px 20px rgba(201,162,39,.45);
+      transition: all .2s;
+    }
+    .btn-draw:hover  { transform: scale(1.05); box-shadow: 0 6px 30px rgba(201,162,39,.65); }
+    .btn-draw:active { transform: scale(.97); }
+    .btn-draw:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    /* ─── 当選番号表示 ─── */
+    .winning-display { text-align: center; margin: 1.4rem 0 .6rem; }
+    .winning-label { font-size: .82rem; color: var(--text-dim); margin-bottom: .5rem; letter-spacing: .1em; }
+    .winning-digits { display: inline-flex; gap: .45rem; }
+    .digit-box {
+      width: 68px; height: 86px;
+      background: #0e0e22;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.4rem;
+      font-weight: bold;
+      color: var(--gold-lt);
+      text-shadow: 0 0 10px rgba(201,162,39,.6);
+      font-family: 'Courier New', monospace;
+    }
+    .digit-box.spin { animation: flash .08s infinite; }
+    @keyframes flash {
+      0%,100% { color: var(--gold-lt); }
+      50%      { color: #fff; text-shadow: 0 0 14px #fff; }
+    }
+
+    /* ─── 結果カード ─── */
+    .results-section { display: flex; flex-direction: column; gap: .9rem; margin-top: .5rem; }
+    .result-card {
+      background: var(--bg2);
+      border-radius: 8px;
+      padding: .95rem 1rem;
+      border-left: 4px solid #333;
+    }
+    .result-card.tier-1 {
+      border-left-color: var(--gold);
+      animation: jackGlow 1.6s ease-in-out infinite;
+    }
+    .result-card.tier-2 { border-left-color: var(--silver); }
+    .result-card.tier-3 { border-left-color: var(--bronze); }
+    .result-card.tier-4 { border-left-color: #3a3a3a; }
+
+    @keyframes jackGlow {
+      0%,100% { box-shadow: 0 0 16px rgba(201,162,39,.4); }
+      50%      { box-shadow: 0 0 40px rgba(201,162,39,.85), 0 0 80px rgba(240,208,96,.3); }
+    }
+
+    .result-header { display: flex; align-items: center; gap: .8rem; margin-bottom: .75rem; flex-wrap: wrap; }
+    .tier-badge {
+      padding: .28rem .75rem;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: .85rem;
+      white-space: nowrap;
+    }
+    .tier-1 .tier-badge { background: var(--gold);   color: #1a0800; }
+    .tier-2 .tier-badge { background: var(--silver);  color: #111; }
+    .tier-3 .tier-badge { background: var(--bronze);  color: #1a0800; }
+    .tier-4 .tier-badge { background: #333;           color: #888; }
+
+    .marble-vs { font-family: monospace; font-size: 1rem; }
+
+    .prize-grid { display: flex; flex-wrap: wrap; gap: .35rem; margin: .45rem 0; }
+    .prize-chip {
+      padding: .22rem .55rem;
+      background: #1c1c38;
+      border: 1px solid #3a3a60;
+      border-radius: 4px;
+      font-size: .78rem;
+      cursor: pointer;
+      transition: all .14s;
+      user-select: none;
+    }
+    .prize-chip:hover   { background: #2a2a50; }
+    .prize-chip.chosen  { background: var(--gold); color: #1a0800; border-color: var(--gold); font-weight: bold; }
+
+    .btn-rand-prize {
+      margin-top: .4rem;
+      padding: .35rem .95rem;
+      background: transparent;
+      border: 1px solid var(--bronze);
+      color: var(--bronze);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: .8rem;
+      transition: all .18s;
+    }
+    .btn-rand-prize:hover { background: rgba(205,127,50,.18); }
+
+    /* ─── 傾向分析 ─── */
+    .trend-section { margin-bottom: 2rem; }
+    .trend-section h2 {
+      font-size: 1.05rem;
+      color: var(--gold);
+      border-bottom: 1px solid #2a2a44;
+      padding-bottom: .45rem;
+      margin-bottom: .9rem;
+    }
+
+    .history-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .history-table th {
+      background: #1e1e3c;
+      color: var(--gold);
+      padding: .55rem .9rem;
+      text-align: center;
+    }
+    .history-table td {
+      border: 1px solid #2a2a44;
+      padding: .55rem .9rem;
+      text-align: center;
+    }
+    .history-table tr:nth-child(even) td { background: #14142a; }
+    .num-hl { font-family: monospace; font-weight: bold; font-size: 1.1rem; color: var(--gold-lt); }
+
+    /* ヒートマップ */
+    .heatmap { display: flex; flex-direction: column; gap: .5rem; }
+    .heatmap-row { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+    .heatmap-lbl { width: 58px; font-size: .75rem; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+    .heatmap-cells { display: flex; gap: .25rem; flex-wrap: wrap; }
+    .hm-cell {
+      width: 44px; height: 40px;
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #2a2a40;
+      transition: transform .12s;
+    }
+    .hm-cell:hover { transform: scale(1.12); }
+    .hm-cell .hm-d { font-weight: bold; font-size: .95rem; }
+    .hm-cell .hm-c { font-size: .62rem; color: rgba(255,255,255,.55); }
+    .hm-0 { background: #141428; }
+    .hm-1 { background: #28205a; color: #aaa8ff; }
+    .hm-2 { background: #6a4010; color: var(--gold-lt); }
+
+    /* ホット/コールド */
+    .badge {
+      display: inline-block;
+      padding: .2rem .55rem;
+      border-radius: 12px;
+      font-size: .78rem;
+      margin: .18rem;
+    }
+    .badge.hot  { background: var(--gold);  color: #1a0800; }
+    .badge.cold { background: #2a2a2a;      color: #777; }
+
+    /* おすすめ番号 */
+    .rec-box {
+      background: #0e0e22;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .rec-num {
+      display: block;
+      font-size: 3rem;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      color: var(--gold);
+      letter-spacing: .4em;
+      text-shadow: 0 0 20px rgba(201,162,39,.5);
+      margin: .5rem 0;
+    }
+    .btn-rec {
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      padding: .45rem 1.4rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: .88rem;
+      transition: all .18s;
+    }
+    .btn-rec:hover { background: rgba(201,162,39,.1); }
+
+    .disclaimer {
+      font-size: .73rem;
+      color: var(--text-dim);
+      border: 1px solid #2a2a44;
+      border-radius: 4px;
+      padding: .55rem .8rem;
+      margin-top: .75rem;
+      line-height: 1.5;
+    }
+
+    /* レスポンシブ */
+    @media (max-width: 560px) {
+      header h1 { font-size: 1.2rem; }
+      .digit-box { width: 52px; height: 68px; font-size: 1.8rem; }
+      .btn-draw { font-size: 1.1rem; padding: .8rem 2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚔️ ノマドモグボナンザ 抽選シミュレーター</h1>
+  <p>24周年記念（2026年）FF11 モグボナンザ</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('sim')">🎲 抽選シミュレーター</button>
+  <button class="tab-btn"        onclick="switchTab('trend')">📊 傾向分析</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════ 抽選タブ -->
+<div id="tab-sim" class="tab-content active">
+  <div class="container">
+
+    <div class="info-bar">
+      <span>💰 玉1個: <strong>200,000ギル</strong></span>
+      <span>🛒 販売期間: <strong>5/14〜5/26</strong></span>
+      <span>📅 当選発表: <strong>6/24</strong></span>
+      <span>🎯 上限: <strong>1キャラ2個まで</strong></span>
+    </div>
+
+    <div class="char-list" id="charList"></div>
+
+    <button class="btn-add-char" onclick="addChar()">＋ キャラクターを追加</button>
+
+    <div class="draw-section">
+      <button class="btn-draw" id="drawBtn" onclick="startDraw()">🎰 抽選！</button>
+    </div>
+
+    <div class="winning-display" id="winDisp" style="display:none">
+      <div class="winning-label">当 選 番 号</div>
+      <div class="winning-digits">
+        <div class="digit-box" id="d0">?</div>
+        <div class="digit-box" id="d1">?</div>
+        <div class="digit-box" id="d2">?</div>
+      </div>
+    </div>
+
+    <div class="results-section" id="resultsSec"></div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════ 傾向分析タブ -->
+<div id="tab-trend" class="tab-content">
+  <div class="container">
+    <div id="trendBody"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ────────────────────────────────────────────
+// 定数データ
+// ────────────────────────────────────────────
+
+const PRIZES = {
+  1: [
+    'アイスブランド','真オニオンソード','エアナイフ','真斬魔刀',
+    'ドラゴンファング','魔人の戦斧','ドラスティクアクス','真アルテミスの弓',
+    'ミラクルチアー','ラストシックル','賢者の杖','チョコボナイフ',
+    'フレイムタン','ダイアアスピス','河伯の槍','陸奥守吉行',
+    '真セイブザクイーン','プレミアムハート','真ブレイブブレイド','柳生の漆黒',
+    'エクゼター','ウィザードロッド','恵比寿釣竿'
+  ],
+  2: [
+    'クーポンA-OmII','クーポンAW-UWIII','クーポンAW-Vgr','クーポンAW-VgrII',
+    'クーポンW-Pulse','クーポンW-Job','クーポンAW-GeIV','クーポンI-RME',
+    'マリグナスシャポー','マリグナスタバード','マリグナスグローブ',
+    'マリグナスタイツ','マリグナスブーツ','マリグナスソード','マリグナスポール',
+    '無の面',
+    'クレパスクラヘルム','クレパスクラメイル','クレパスクラプリス',
+    'クレパスクラサイズ','クレパスクラナイフ',
+    'シェーパーケープ','太公望の釣竿',
+    'スローダタスラム','スローダネックレス','スローダピアス',
+    'スローダリング','スローダベルト'
+  ],
+  3: [
+    '無外装','無喉輪','無腰当',
+    '昏黄礫','昏黄耳飾り','昏黄指輪',
+    'マリグナスピアス',
+    '不倶戴天','タジャウジョシャン','オクーバクラウン','カラクールキャップ','オーラムコッファー',
+    'チョコボトルク','フィッシャトルク','木彫師のトルク','鍛冶師のトルク',
+    '彫金師のトルク','骨細工師のトルク','革細工師のトルク','裁縫師のトルク','調理師のトルク',
+    'オーパスシェルフ',
+    '翡翠のトルク','サファイアのトルク',
+    '宝箱（小）','宝箱（中）','宝箱（大）',
+    'ウェル'
+  ],
+  4: ['ボナンザボール']
+};
+
+const TIER_NAME  = { 1:'1等', 2:'2等', 3:'3等', 4:'4等（ハズレ）' };
+const TIER_CLASS = { 1:'tier-1', 2:'tier-2', 3:'tier-3', 4:'tier-4' };
+
+const HISTORY = [
+  { year:'19周年', first:'596', second:'22', third:'4' },
+  { year:'21周年', first:'800', second:'71', third:'7' },
+  { year:'22周年', first:'789', second:'77', third:'4' },
+  { year:'23周年', first:'508', second:'08', third:'0' },
+];
+
+// ────────────────────────────────────────────
+// キャラ管理
+// ────────────────────────────────────────────
+
+let uid = 0;
+
+function addChar(name = '') {
+  const id = uid++;
+  const div = document.createElement('div');
+  div.className = 'char-card';
+  div.id = `char-${id}`;
+  div.innerHTML = `
+    <div class="char-header">
+      <input class="char-name-input" type="text" placeholder="キャラ名（任意）" value="${escHtml(name)}">
+      <button class="btn-remove" onclick="removeChar(${id})">✕ 削除</button>
+    </div>
+    <div class="marbles-row">
+      <div class="marble-group">
+        <span class="marble-label">玉&nbsp;①</span>
+        <input class="marble-input" type="text" maxlength="3" placeholder="000" inputmode="numeric">
+      </div>
+      <div class="marble-group">
+        <span class="marble-label">玉&nbsp;②</span>
+        <input class="marble-input" type="text" maxlength="3" placeholder="---" inputmode="numeric">
+      </div>
+    </div>`;
+  div.querySelectorAll('.marble-input').forEach(el => {
+    el.addEventListener('input', () => { el.value = el.value.replace(/\D/g,'').slice(0,3); });
+  });
+  document.getElementById('charList').appendChild(div);
+}
+
+function removeChar(id) {
+  const el = document.getElementById(`char-${id}`);
+  if (el) el.remove();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ────────────────────────────────────────────
+// 等級判定
+// ────────────────────────────────────────────
+
+function checkTier(marble, winning) {
+  const m = marble.padStart(3,'0');
+  const w = winning.padStart(3,'0');
+  if (m === w)           return 1;
+  if (m.slice(1) === w.slice(1)) return 2;
+  if (m[2] === w[2])     return 3;
+  return 4;
+}
+
+// ────────────────────────────────────────────
+// 抽選アニメーション
+// ────────────────────────────────────────────
+
+function startDraw() {
+  const chars = document.querySelectorAll('.char-card');
+  if (!chars.length) { alert('キャラクターを追加してください'); return; }
+
+  const btn = document.getElementById('drawBtn');
+  btn.disabled = true;
+
+  const winning = String(Math.floor(Math.random() * 1000)).padStart(3,'0');
+  document.getElementById('winDisp').style.display = 'block';
+  document.getElementById('resultsSec').innerHTML = '';
+
+  const dEls = ['d0','d1','d2'].map(id => document.getElementById(id));
+  dEls.forEach(el => { el.textContent = '?'; el.classList.add('spin'); });
+
+  const TOTAL = 28;
+  const LOCK  = [TOTAL - 9, TOTAL - 5, TOTAL];
+  let f = 0;
+
+  const iv = setInterval(() => {
+    f++;
+    dEls.forEach((el, i) => {
+      if (f < LOCK[i]) {
+        el.textContent = Math.floor(Math.random() * 10);
+      } else {
+        el.textContent = winning[i];
+        el.classList.remove('spin');
+      }
+    });
+    if (f >= TOTAL) {
+      clearInterval(iv);
+      setTimeout(() => { showResults(winning); btn.disabled = false; }, 320);
+    }
+  }, 58);
+}
+
+// ────────────────────────────────────────────
+// 結果表示
+// ────────────────────────────────────────────
+
+function showResults(winning) {
+  const sec = document.getElementById('resultsSec');
+  sec.innerHTML = '';
+
+  document.querySelectorAll('.char-card').forEach(card => {
+    const name = card.querySelector('.char-name-input').value.trim() || 'キャラ';
+    card.querySelectorAll('.marble-input').forEach((inp, idx) => {
+      const val = inp.value.trim();
+      if (!val) return;
+
+      const marble = val.padStart(3,'0');
+      const tier   = checkTier(marble, winning);
+      const pid    = `pg-${name}-${idx}`;
+
+      const div = document.createElement('div');
+      div.className = `result-card ${TIER_CLASS[tier]}`;
+      div.innerHTML = `
+        <div class="result-header">
+          <span class="tier-badge">${TIER_NAME[tier]}</span>
+          <span style="font-size:.88rem">${escHtml(name)}&nbsp;玉${idx+1}</span>
+          <span class="marble-vs">${matchHtml(marble, winning)}</span>
+        </div>
+        ${tier < 4 ? `
+          <div class="prize-grid" id="${pid}">
+            ${PRIZES[tier].map(p=>`<span class="prize-chip">${escHtml(p)}</span>`).join('')}
+          </div>
+          <button class="btn-rand-prize" onclick="pickRand('${pid}')">🎲 ランダム景品を選ぶ</button>
+        ` : `
+          <div style="color:var(--text-dim);font-size:.88rem;padding:.25rem 0">
+            🎱 ボナンザボール を獲得
+          </div>
+        `}`;
+      sec.appendChild(div);
+    });
+  });
+}
+
+function matchHtml(marble, winning) {
+  return marble.split('').map((d, i) =>
+    d === winning[i]
+      ? `<span style="color:var(--gold-lt);font-weight:bold">${d}</span>`
+      : `<span style="color:#555">${d}</span>`
+  ).join('') + `&nbsp;<span style="color:#444">vs</span>&nbsp;<span style="color:#888">${winning}</span>`;
+}
+
+function pickRand(pid) {
+  const grid  = document.getElementById(pid);
+  const chips = grid.querySelectorAll('.prize-chip');
+  chips.forEach(c => c.classList.remove('chosen'));
+  const pick = chips[Math.floor(Math.random() * chips.length)];
+  pick.classList.add('chosen');
+  pick.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+// ────────────────────────────────────────────
+// タブ切り替え
+// ────────────────────────────────────────────
+
+function switchTab(id) {
+  ['sim','trend'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === id);
+  });
+  document.querySelectorAll('.tab-btn').forEach((b, i) =>
+    b.classList.toggle('active', ['sim','trend'][i] === id));
+  if (id === 'trend') buildTrend();
+}
+
+// ────────────────────────────────────────────
+// 傾向分析
+// ────────────────────────────────────────────
+
+function digitFreq() {
+  const freq = [{},{},{}];
+  for (let d = 0; d <= 9; d++) [0,1,2].forEach(i => { freq[i][d] = 0; });
+  HISTORY.forEach(h => {
+    h.first.padStart(3,'0').split('').forEach((ch, i) => { freq[i][ch] = (freq[i][ch]||0) + 1; });
+  });
+  return freq;
+}
+
+function buildTrend() {
+  const freq   = digitFreq();
+  const posLbl = ['百の位','十の位','一の位'];
+  const maxF   = Math.max(...freq.flatMap(f => Object.values(f)));
+
+  // 過去当選テーブル
+  const rows = HISTORY.map(h =>
+    `<tr>
+       <td>${h.year}</td>
+       <td><span class="num-hl">${h.first}</span></td>
+       <td>${h.second}</td>
+       <td>${h.third}</td>
+     </tr>`
+  ).join('');
+
+  // ヒートマップ
+  const hmRows = freq.map((f, pi) => {
+    const cells = Object.entries(f).map(([d, cnt]) => {
+      const ratio = maxF > 0 ? cnt / maxF : 0;
+      const cls   = ratio === 0 ? 'hm-0' : ratio <= .5 ? 'hm-1' : 'hm-2';
+      return `<div class="hm-cell ${cls}"><span class="hm-d">${d}</span><span class="hm-c">${cnt}回</span></div>`;
+    }).join('');
+    return `<div class="heatmap-row"><span class="heatmap-lbl">${posLbl[pi]}</span><div class="heatmap-cells">${cells}</div></div>`;
+  }).join('');
+
+  // ホット/コールド
+  const hcHtml = freq.map((f, pi) => {
+    const max  = Math.max(...Object.values(f));
+    const hot  = Object.keys(f).filter(k => f[k] === max && max > 0);
+    const cold = Object.keys(f).filter(k => f[k] === 0);
+    const coldDisp = cold.length > 5
+      ? cold.slice(0,5).map(d=>`<span class="badge cold">❄ ${d}</span>`).join('') + `<span style="font-size:.72rem;color:var(--text-dim)"> 他${cold.length-5}個</span>`
+      : cold.map(d=>`<span class="badge cold">❄ ${d}</span>`).join('');
+    return `<div style="margin-bottom:.6rem">
+      <span style="font-size:.78rem;color:var(--text-dim)">${posLbl[pi]}：</span>
+      ${hot.map(d=>`<span class="badge hot">🔥 ${d}</span>`).join('')}
+      ${coldDisp}
+    </div>`;
+  }).join('');
+
+  document.getElementById('trendBody').innerHTML = `
+    <div class="trend-section">
+      <h2>📋 過去の当選番号（参考）</h2>
+      <table class="history-table">
+        <thead><tr><th>回</th><th>1等（全3桁）</th><th>2等（下2桁）</th><th>3等（下1桁）</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <div class="trend-section">
+      <h2>🌡 桁別出現頻度ヒートマップ（1等 全${HISTORY.length}回）</h2>
+      <div class="heatmap">${hmRows}</div>
+      <div style="font-size:.72rem;color:var(--text-dim);margin-top:.5rem">
+        🟣 薄紫=1回出現　🟠 オレンジ=2回出現（最頻）
+      </div>
+    </div>
+
+    <div class="trend-section">
+      <h2>🔥 ホット / ❄ コールド数字</h2>
+      ${hcHtml}
+    </div>
+
+    <div class="trend-section">
+      <h2>🎯 おすすめ番号（傾向ベース）</h2>
+      <div class="rec-box">
+        <div style="font-size:.82rem;color:var(--text-dim)">各桁の最頻出数字を採用（同率の場合はランダム）</div>
+        <span class="rec-num" id="recNum">─ ─ ─</span>
+        <button class="btn-rec" onclick="genRec()">おすすめ番号を生成</button>
+      </div>
+      <div class="disclaimer">
+        ⚠️ このデータはエンタメ目的です。ボナンザの抽選は真のランダムであり、過去の当選番号は次回の結果に一切影響しません。
+        4回分のサンプルでは統計的な有意性はほぼありません。あくまでも参考程度にお楽しみください。
+      </div>
+    </div>`;
+}
+
+function genRec() {
+  const freq = digitFreq();
+  const rec  = freq.map(f => {
+    const max = Math.max(...Object.values(f));
+    const hot = Object.keys(f).filter(k => f[k] === max);
+    return hot[Math.floor(Math.random() * hot.length)];
+  }).join('');
+  document.getElementById('recNum').textContent = rec.split('').join(' ');
+}
+
+// ────────────────────────────────────────────
+// 初期化
+// ────────────────────────────────────────────
+addChar();
+</script>
+</body>
+</html>
