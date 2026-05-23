@@ -171,78 +171,81 @@ gFunctions.HasStatusEffect = function(effectId)
 end
 
 --------------------------------------------------------------------------------
--- バフ一覧を詳細出力（マニューバー効果時間調査用）
+-- API プローブ: 正しいメソッド名を特定する
 -- /pethud buffcheck で呼び出す
 --------------------------------------------------------------------------------
 gFunctions.PrintBuffCheck = function()
-    print('[PetHud] ===== Buff Check v2 =====');
+    print('[PetHud] ===== API Probe =====');
     local player = AshitaCore:GetMemoryManager():GetPlayer();
-    if player == nil then
-        print('[PetHud] ERROR: GetPlayer() returned nil');
-        print('[PetHud] ===========================');
-        return;
-    end
+    local party  = AshitaCore:GetMemoryManager():GetParty();
 
-    -- ① まず slot 0 だけ pcall なしでテスト → API エラーを可視化
-    local apiOk, apiErr = pcall(function()
-        local v = player:GetStatusEffect(0);
-        print(string.format('[PetHud] GetStatusEffect(0) raw = %s', tostring(v)));
-    end);
-    if not apiOk then
-        print('[PetHud] GetStatusEffect() API ERROR: ' .. tostring(apiErr));
-        -- 代替: Partyメモリ経由を試みる
-        local ok2, err2 = pcall(function()
-            local party = AshitaCore:GetMemoryManager():GetParty();
-            print('[PetHud] --- Party buff fallback ---');
-            for i = 0, 31 do
-                local bid = party:GetMemberStatusEffect(0, i);
-                if bid ~= nil and bid ~= 0 then
-                    print(string.format('[PetHud]  party[0][%2d] id=%d', i, bid));
-                end
+    -- player オブジェクトのバフ系メソッド候補を全列挙
+    local playerMethods = {
+        'GetStatusEffect',
+        'GetStatusEffectParam',
+        'GetStatusEffectTimer',
+        'GetBuff',
+        'GetBuffId',
+        'GetBuffParam',
+        'GetBuffTimer',
+        'GetBuffs',
+        'GetStatusEffects',
+    };
+    print('[PetHud] -- player methods --');
+    for _, m in ipairs(playerMethods) do
+        local ok, v = pcall(function() return player[m](player, 0); end);
+        if ok then
+            print(string.format('[PetHud]  player:%s(0) = %s  [OK]', m, tostring(v)));
+        else
+            -- nilかエラーか区別
+            if player[m] == nil then
+                print(string.format('[PetHud]  player:%s  = nil (no such method)', m));
+            else
+                print(string.format('[PetHud]  player:%s  = exists but call failed', m));
             end
-        end);
-        if not ok2 then
-            print('[PetHud] Party fallback ERROR: ' .. tostring(err2));
-        end
-        print('[PetHud] ===========================');
-        return;
-    end
-
-    -- ② 全スロットスキャン（id≠0 のみ表示。0 が続く場合のみ先頭4スロット強制表示）
-    local found = false;
-    for i = 0, 31 do
-        local effId = 0;
-        local param  = 0;
-        local timer  = 0;
-
-        local ok, err = pcall(function()
-            effId = player:GetStatusEffect(i);
-            param = player:GetStatusEffectParam(i);
-            timer = player:GetStatusEffectTimer(i);
-        end);
-
-        if not ok then
-            print(string.format('[PetHud] pcall error at i=%d : %s', i, tostring(err)));
-            break;
-        end
-
-        local showLine = (effId ~= nil and effId ~= 0);
-        if not found and i < 4 then showLine = true; end  -- 先頭4スロットは0でも強制出力
-
-        if showLine then
-            if effId ~= 0 then found = true; end
-            -- timer は 秒そのまま / 秒×60 の両方を表示
-            print(string.format('[PetHud]  [%2d] id=%-5d param=%-6d timer=%d  (as-sec=%.1f  div60=%.1f)',
-                i, effId or 0, param or 0, timer or 0,
-                (timer or 0),
-                (timer or 0) / 60.0));
         end
     end
 
-    if not found then
-        print('[PetHud] (アクティブなバフなし / 全スロット 0)');
+    -- party オブジェクトのバフ系メソッド候補
+    local partyMethods = {
+        'GetMemberBuff',
+        'GetMemberBuffId',
+        'GetMemberBuffTimer',
+        'GetMemberStatusEffect',
+        'GetMemberStatusEffectParam',
+        'GetMemberStatusEffectTimer',
+        'GetMemberStatus',
+    };
+    print('[PetHud] -- party methods --');
+    for _, m in ipairs(partyMethods) do
+        local ok, v = pcall(function() return party[m](party, 0, 0); end);
+        if ok then
+            print(string.format('[PetHud]  party:%s(0,0) = %s  [OK]', m, tostring(v)));
+        else
+            if party[m] == nil then
+                print(string.format('[PetHud]  party:%s  = nil (no such method)', m));
+            else
+                print(string.format('[PetHud]  party:%s  = exists but call failed', m));
+            end
+        end
     end
-    print('[PetHud] ===========================');
+
+    -- 見つかったメソッドでバフスキャン（[OK] が出たメソッドを使う）
+    -- GetMemberBuff が [OK] なら party 経由でスキャン
+    if party.GetMemberBuff ~= nil then
+        print('[PetHud] -- party:GetMemberBuff scan --');
+        for i = 0, 31 do
+            local ok, v = pcall(function() return party:GetMemberBuff(0, i); end);
+            if ok and v ~= nil and v ~= 0 then
+                -- タイマーも試みる
+                local timerOk, t = pcall(function() return party:GetMemberBuffTimer(0, i); end);
+                local tStr = timerOk and tostring(t) or '?';
+                print(string.format('[PetHud]  buff[%2d] id=%d  timer=%s', i, v, tStr));
+            end
+        end
+    end
+
+    print('[PetHud] =====================');
 end
 
 return gFunctions;
