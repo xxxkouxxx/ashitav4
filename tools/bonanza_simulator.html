@@ -3,743 +3,262 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ノマドモグボナンザ 購入番号サポート</title>
+  <title>ノマドモグボナンザ 購入記録</title>
   <style>
     :root {
-      --bg:        #0d0d1a;
-      --bg2:       #1a1a30;
-      --gold:      #c9a227;
-      --gold-lt:   #f0d060;
-      --silver:    #a0a8c0;
-      --bronze:    #cd7f32;
-      --text:      #e8e0d0;
-      --text-dim:  #777;
+      --bg:    #0d0d1a;
+      --bg2:   #14142a;
+      --bg3:   #0f0f20;
+      --brd:   #2a2a44;
+      --gold:  #c9a227;
+      --gldt:  #f0d060;
+      --text:  #ddd8c8;
+      --dim:   #666;
+      --t1c:   #f0d060;
+      --t2c:   #a8b8ff;
+      --t3c:   #e0a8a8;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
-      min-height: 100vh;
-    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI','Noto Sans JP',sans-serif; min-height: 100vh; }
 
     /* ─── ヘッダー ─── */
     header {
       text-align: center;
-      padding: 1.8rem 1rem 1.2rem;
-      background: linear-gradient(180deg, #070712 0%, #1a1a30 100%);
+      padding: 1.3rem 1rem .9rem;
+      background: linear-gradient(180deg, #070712 0%, #14142a 100%);
       border-bottom: 2px solid var(--gold);
     }
-    header h1 {
-      font-size: 1.7rem;
-      color: var(--gold);
-      text-shadow: 0 0 24px rgba(201,162,39,.55);
-      letter-spacing: .08em;
-    }
-    header p { color: var(--text-dim); font-size: .82rem; margin-top: .3rem; }
+    header h1 { font-size: 1.35rem; color: var(--gold); letter-spacing: .06em; }
+    header p  { font-size: .75rem; color: var(--dim); margin-top: .2rem; }
 
-    /* ─── タブ ─── */
-    .tabs {
-      display: flex;
-      justify-content: center;
-      gap: .5rem;
-      padding: .9rem 1rem;
-      background: var(--bg2);
-      border-bottom: 1px solid #2a2a44;
-    }
-    .tab-btn {
-      padding: .55rem 1.4rem;
-      border: 1px solid var(--gold);
-      background: transparent;
-      color: var(--gold);
-      cursor: pointer;
-      border-radius: 4px;
-      font-size: .88rem;
-      transition: all .18s;
-    }
-    .tab-btn.active { background: var(--gold); color: #1a0a00; font-weight: bold; }
+    /* ─── メインレイアウト ─── */
+    .main { max-width: 620px; margin: 0 auto; padding: 1.2rem 1rem 3rem; display: flex; flex-direction: column; gap: 1.2rem; }
 
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    .container { max-width: 860px; margin: 0 auto; padding: 1.4rem 1rem; }
-
-    /* ─── 情報バー ─── */
-    .info-bar {
-      background: #111128;
-      border: 1px solid #2a2a44;
-      border-radius: 6px;
-      padding: .55rem 1rem;
-      margin-bottom: 1.2rem;
-      font-size: .78rem;
-      color: var(--text-dim);
-      display: flex;
-      gap: 1.2rem;
-      flex-wrap: wrap;
+    /* ─── ステップカード ─── */
+    .step-card { background: var(--bg2); border: 1px solid var(--brd); border-radius: 10px; overflow: hidden; }
+    .step-head {
+      display: flex; align-items: center; gap: .65rem;
+      padding: .65rem 1rem; background: var(--bg3); border-bottom: 1px solid var(--brd);
     }
-    .info-bar strong { color: var(--text); }
+    .step-num {
+      background: var(--gold); color: #1a1200;
+      width: 20px; height: 20px; border-radius: 50%;
+      font-size: .72rem; font-weight: bold;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .step-title { font-size: .9rem; font-weight: bold; }
+    .step-sub   { font-size: .7rem; color: var(--dim); margin-left: auto; }
+    .step-body  { padding: .9rem 1rem; }
 
-    /* ─── キャラカード ─── */
-    .char-list { display: flex; flex-direction: column; gap: .9rem; margin-bottom: 1.2rem; }
-
-    .char-card {
-      background: var(--bg2);
-      border: 1px solid #2e2e50;
-      border-radius: 8px;
-      padding: .9rem;
+    /* ─── キャラ行 ─── */
+    .char-rows { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .7rem; }
+    .char-row {
+      display: grid;
+      grid-template-columns: 1fr 64px 64px 30px;
+      gap: .35rem; align-items: center;
     }
-    .char-header {
-      display: flex;
-      align-items: center;
-      gap: .7rem;
-      margin-bottom: .75rem;
+    input[type="text"] {
+      background: var(--bg); border: 1px solid var(--brd);
+      border-radius: 5px; color: var(--text);
+      padding: .38rem .5rem; font-size: .88rem;
+      outline: none; width: 100%; transition: border-color .15s;
     }
-    .char-name-input {
-      background: #111128;
-      border: 1px solid #3a3a60;
-      color: var(--text);
-      padding: .38rem .6rem;
-      border-radius: 4px;
-      font-size: .88rem;
-      flex: 1;
-    }
-    .marbles-row { display: flex; gap: 1.2rem; flex-wrap: wrap; align-items: center; }
-    .marble-group { display: flex; align-items: center; gap: .45rem; }
-    .marble-label { font-size: .75rem; color: var(--text-dim); white-space: nowrap; }
-    .marble-input {
-      background: #111128;
-      border: 2px solid var(--gold);
-      color: var(--gold-lt);
-      padding: .38rem .55rem;
-      border-radius: 5px;
-      font-size: 1.15rem;
-      font-weight: bold;
-      width: 78px;
-      text-align: center;
-      letter-spacing: .18em;
+    input[type="text"]:focus { border-color: var(--gold); }
+    .mi {
       font-family: 'Courier New', monospace;
+      font-size: .95rem; text-align: center;
+      letter-spacing: .08em; color: var(--gldt);
     }
-    .marble-input::placeholder { color: #444; letter-spacing: .05em; }
+    .mi::placeholder { color: #333; letter-spacing: 0; }
+    .btn-rm {
+      background: none; border: 1px solid #333; color: #555;
+      border-radius: 4px; cursor: pointer; font-size: .7rem;
+      height: 30px; transition: all .15s; padding: 0;
+    }
+    .btn-rm:hover { border-color: #884444; color: #cc6666; }
 
-    .btn-remove {
-      background: #3a0000;
-      border: 1px solid #660000;
-      color: #ff7070;
-      padding: .28rem .55rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: .75rem;
+    /* ─── 共通ボタン群 ─── */
+    .btn-add {
+      background: none; border: 1px dashed var(--brd); color: var(--dim);
+      border-radius: 6px; padding: .45rem; width: 100%;
+      cursor: pointer; font-size: .82rem; transition: all .15s;
     }
-    .btn-add-char {
-      background: transparent;
-      border: 1px dashed var(--gold);
-      color: var(--gold);
-      padding: .55rem 1.2rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: .88rem;
-      width: 100%;
-      transition: all .2s;
-    }
-    .btn-add-char:hover { background: rgba(201,162,39,.08); }
+    .btn-add:hover { border-color: var(--gold); color: var(--gold); }
 
-    /* ─── 抽選ボタン ─── */
-    /* ─── 当選照合 ─── */
-    .verify-section {
-      text-align: center;
-      margin: 1.6rem 0;
-      padding: 1.2rem 1rem;
-      background: var(--bg2);
-      border: 1px solid #2a2a44;
-      border-radius: 8px;
+    .btn-row { display: flex; gap: .5rem; margin-top: .65rem; }
+    .btn-save, .btn-load {
+      flex: 1; background: none; padding: .5rem .4rem;
+      border-radius: 6px; cursor: pointer; font-size: .8rem;
+      transition: all .15s; text-align: center;
     }
-    .verify-label {
-      font-size: .95rem;
-      color: var(--gold);
-      font-weight: bold;
-      margin-bottom: .7rem;
+    .btn-save { border: 1px solid #5a7a5a; color: #88bb88; }
+    .btn-save:hover { background: rgba(100,180,100,.1); }
+    .btn-load { border: 1px solid #4a6a7a; color: #88aacc; display: block; }
+    .btn-load:hover { background: rgba(100,150,200,.1); }
+
+    /* ─── 当選番号入力 ─── */
+    .win-row { display: flex; gap: .7rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: .8rem; }
+    .win-cell { display: flex; flex-direction: column; gap: .22rem; }
+    .win-cell label { font-size: .67rem; color: var(--dim); }
+    .wi {
+      font-family: 'Courier New', monospace; font-size: 1.35rem;
+      text-align: center; color: var(--gldt); letter-spacing: .12em;
+      padding: .32rem .4rem; background: var(--bg);
+      border: 2px solid var(--brd); border-radius: 6px;
+      outline: none; transition: border-color .15s;
     }
-    .verify-tier-row {
-      display: flex;
-      justify-content: center;
-      align-items: flex-end;
-      gap: 1rem;
-      margin-bottom: .7rem;
-      flex-wrap: wrap;
-    }
-    .verify-tier-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: .3rem;
-    }
-    .verify-tier-cell label {
-      font-size: .7rem;
-      color: var(--text-dim);
-      letter-spacing: .05em;
-    }
-    .winning-input {
-      padding: .4rem .5rem;
-      font-size: 1.5rem;
-      font-family: 'Courier New', monospace;
-      text-align: center;
-      background: #0d0d1a;
-      border: 2px solid #3a3a60;
-      border-radius: 6px;
-      color: var(--gold-lt);
-      letter-spacing: .2em;
-      outline: none;
-      transition: border-color .18s;
-    }
-    .winning-input:focus { border-color: var(--gold); }
-    .wi-3 { width: 88px; }
-    .wi-2 { width: 66px; }
-    .wi-1 { width: 46px; }
-    .verify-actions { display: flex; justify-content: center; gap: .7rem; align-items: center; flex-wrap: wrap; margin-bottom: .45rem; }
+    .wi:focus { border-color: var(--gold); }
+    .wi3 { width: 78px; } .wi2 { width: 58px; } .wi1 { width: 40px; }
     .btn-verify {
-      padding: .55rem 1.4rem;
-      background: var(--gold);
-      border: none;
-      color: #1a1200;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: .9rem;
-      font-weight: bold;
-      transition: all .18s;
+      background: var(--gold); border: none; color: #1a1200;
+      padding: .56rem 1.4rem; border-radius: 6px;
+      cursor: pointer; font-size: .88rem; font-weight: bold;
+      transition: all .15s; align-self: flex-end;
     }
-    .btn-verify:hover { background: var(--gold-lt); }
-    .btn-verify:disabled { opacity: .45; cursor: not-allowed; }
-    .verify-hint { font-size: .75rem; color: var(--text-dim); }
-    /* ─── インポート ─── */
-    .import-section {
-      text-align: center;
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid #2a2a44;
-    }
-    .btn-import {
-      display: inline-block;
-      background: transparent;
-      border: 1px solid #4a6a7a;
-      color: #88aacc;
-      padding: .5rem 1.2rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: .85rem;
-      transition: all .18s;
-    }
-    .btn-import:hover { background: rgba(100,150,200,.1); border-color: #88aacc; }
+    .btn-verify:hover { background: var(--gldt); }
 
-    /* (旧 draw-section 跡地 — digit-box は当選表示で継続利用) */
-    .btn-draw {
-      background: linear-gradient(135deg, #a07010, #c9a227, #daa520, #c9a227, #a07010);
-      border: none;
-      color: #1a0800;
-      padding: .95rem 3rem;
-      font-size: 1.35rem;
-      font-weight: bold;
-      border-radius: 50px;
-      cursor: pointer;
-      letter-spacing: .1em;
-      box-shadow: 0 4px 20px rgba(201,162,39,.45);
-      transition: all .2s;
+    /* ─── 照合結果 ─── */
+    .result-banner {
+      background: #1a1a00; border: 1px solid var(--gold);
+      border-radius: 7px; padding: .6rem 1rem;
+      text-align: center; color: var(--gold);
+      font-weight: bold; font-size: .9rem; margin-bottom: .6rem;
     }
-    .btn-draw:hover  { transform: scale(1.05); box-shadow: 0 6px 30px rgba(201,162,39,.65); }
-    .btn-draw:active { transform: scale(.97); }
-    .btn-draw:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    .result-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+    .result-table th {
+      background: var(--bg3); color: var(--dim); font-weight: normal;
+      padding: .4rem .55rem; border-bottom: 1px solid var(--brd);
+      font-size: .72rem; text-align: left;
+    }
+    .result-table td { padding: .42rem .55rem; border-bottom: 1px solid #1a1a2e; vertical-align: middle; }
+    .result-table tr:last-child td { border-bottom: none; }
+    .result-table td:first-child { color: var(--text); }
+    .mc { font-family: 'Courier New', monospace; font-size: .9rem; }
+    .r1 { color: var(--t1c); font-weight: bold; }
+    .r2 { color: var(--t2c); font-weight: bold; }
+    .r3 { color: var(--t3c); }
+    .r4 { color: #3a3a55; }
+    .tier-tag { font-size: .65rem; margin-left: .3rem; opacity: .8; }
 
-    /* ─── 当選番号表示 ─── */
-    .winning-display { text-align: center; margin: 1.4rem 0 .6rem; }
-    .winning-label { font-size: .82rem; color: var(--text-dim); margin-bottom: .5rem; letter-spacing: .1em; }
-    .winning-digits { display: inline-flex; gap: .45rem; }
-    .digit-box {
-      width: 68px; height: 86px;
-      background: #0e0e22;
-      border: 2px solid var(--gold);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2.4rem;
-      font-weight: bold;
-      color: var(--gold-lt);
-      text-shadow: 0 0 10px rgba(201,162,39,.6);
-      font-family: 'Courier New', monospace;
+    /* ─── 傾向分析（折りたたみ） ─── */
+    details { background: var(--bg2); border: 1px solid var(--brd); border-radius: 10px; overflow: hidden; }
+    details summary {
+      padding: .7rem 1rem; cursor: pointer;
+      font-size: .82rem; color: var(--dim);
+      list-style: none; user-select: none; transition: color .15s;
     }
-    .digit-box.spin { animation: flash .08s infinite; }
-    @keyframes flash {
-      0%,100% { color: var(--gold-lt); }
-      50%      { color: #fff; text-shadow: 0 0 14px #fff; }
-    }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before { content: '▶  '; font-size: .6rem; }
+    details[open] summary::before { content: '▼  '; }
+    details summary:hover { color: var(--text); }
+    .trend-inner { padding: 1rem; }
 
-    /* ─── 結果カード ─── */
-    .results-section { display: flex; flex-direction: column; gap: .9rem; margin-top: .5rem; }
-    .result-card {
-      background: var(--bg2);
-      border-radius: 8px;
-      padding: .95rem 1rem;
-      border-left: 4px solid #333;
-    }
-    .result-card.tier-1 {
-      border-left-color: var(--gold);
-      animation: jackGlow 1.6s ease-in-out infinite;
-    }
-    .result-card.tier-2 { border-left-color: var(--silver); }
-    .result-card.tier-3 { border-left-color: var(--bronze); }
-    .result-card.tier-4 { border-left-color: #3a3a3a; }
-
-    @keyframes jackGlow {
-      0%,100% { box-shadow: 0 0 16px rgba(201,162,39,.4); }
-      50%      { box-shadow: 0 0 40px rgba(201,162,39,.85), 0 0 80px rgba(240,208,96,.3); }
-    }
-
-    .result-header { display: flex; align-items: center; gap: .8rem; margin-bottom: .75rem; flex-wrap: wrap; }
-    .tier-badge {
-      padding: .28rem .75rem;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: .85rem;
-      white-space: nowrap;
-    }
-    .tier-1 .tier-badge { background: var(--gold);   color: #1a0800; }
-    .tier-2 .tier-badge { background: var(--silver);  color: #111; }
-    .tier-3 .tier-badge { background: var(--bronze);  color: #1a0800; }
-    .tier-4 .tier-badge { background: #333;           color: #888; }
-
-    .marble-vs { font-family: monospace; font-size: 1rem; }
-
-    .prize-grid { display: flex; flex-wrap: wrap; gap: .35rem; margin: .45rem 0; }
-    .prize-chip {
-      padding: .22rem .55rem;
-      background: #1c1c38;
-      border: 1px solid #3a3a60;
-      border-radius: 4px;
-      font-size: .78rem;
-      cursor: pointer;
-      transition: all .14s;
-      user-select: none;
-    }
-    .prize-chip:hover   { background: #2a2a50; }
-    .prize-chip.chosen  { background: var(--gold); color: #1a0800; border-color: var(--gold); font-weight: bold; }
-
-    .btn-rand-prize {
-      margin-top: .4rem;
-      padding: .35rem .95rem;
-      background: transparent;
-      border: 1px solid var(--bronze);
-      color: var(--bronze);
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: .8rem;
-      transition: all .18s;
-    }
-    .btn-rand-prize:hover { background: rgba(205,127,50,.18); }
-
-    /* ─── 傾向分析 ─── */
-    .trend-section { margin-bottom: 2rem; }
-    .trend-section h2 {
-      font-size: 1.05rem;
-      color: var(--gold);
-      border-bottom: 1px solid #2a2a44;
-      padding-bottom: .45rem;
-      margin-bottom: .9rem;
-    }
-
-    .history-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
-    .history-table th {
-      background: #1e1e3c;
-      color: var(--gold);
-      padding: .55rem .9rem;
-      text-align: center;
-    }
-    .history-table td {
-      border: 1px solid #2a2a44;
-      padding: .55rem .9rem;
-      text-align: center;
-    }
-    .history-table tr:nth-child(even) td { background: #14142a; }
-    .num-hl { font-family: monospace; font-weight: bold; font-size: 1.1rem; color: var(--gold-lt); }
-
-    /* ヒートマップ */
-    .heatmap { display: flex; flex-direction: column; gap: .5rem; }
-    .heatmap-row { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
-    .heatmap-lbl { width: 58px; font-size: .75rem; color: var(--text-dim); text-align: right; flex-shrink: 0; }
-    .heatmap-cells { display: flex; gap: .25rem; flex-wrap: wrap; }
-    .hm-cell {
-      width: 44px; height: 40px;
-      border-radius: 5px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid #2a2a40;
-      transition: transform .12s;
-    }
-    .hm-cell:hover { transform: scale(1.12); }
-    .hm-cell .hm-d { font-weight: bold; font-size: .95rem; }
-    .hm-cell .hm-c { font-size: .62rem; color: rgba(255,255,255,.55); }
-    .hm-0 { background: #141428; }
-    .hm-1 { background: #28205a; color: #aaa8ff; }
-    .hm-2 { background: #6a4010; color: var(--gold-lt); }
-
-    /* ホット/コールド */
-    .badge {
-      display: inline-block;
-      padding: .2rem .55rem;
-      border-radius: 12px;
-      font-size: .78rem;
-      margin: .18rem;
-    }
-    .badge.hot  { background: var(--gold);  color: #1a0800; }
-    .badge.cold { background: #2a2a2a;      color: #777; }
-
-    /* おすすめ番号 */
-    .rec-box {
-      background: #0e0e22;
-      border: 2px solid var(--gold);
-      border-radius: 8px;
-      padding: 1rem;
-      text-align: center;
-    }
-    .rec-num {
-      display: block;
-      font-size: 3rem;
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-      color: var(--gold);
-      letter-spacing: .4em;
-      text-shadow: 0 0 20px rgba(201,162,39,.5);
-      margin: .5rem 0;
-    }
-    .btn-rec {
-      background: transparent;
-      border: 1px solid var(--gold);
-      color: var(--gold);
-      padding: .45rem 1.4rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: .88rem;
-      transition: all .18s;
-    }
-    .btn-rec:hover { background: rgba(201,162,39,.1); }
-
-    .disclaimer {
-      font-size: .73rem;
-      color: var(--text-dim);
-      border: 1px solid #2a2a44;
-      border-radius: 4px;
-      padding: .55rem .8rem;
-      margin-top: .75rem;
-      line-height: 1.5;
-    }
-
-    /* ─── 傾向ピッカー ─── */
-    .picker-panel {
-      background: var(--bg2);
-      border: 1px solid #3a3a60;
-      border-radius: 8px;
-      margin: 1rem 0;
-      overflow: hidden;
-    }
-    .picker-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: .65rem 1rem;
-      cursor: pointer;
-      font-size: .9rem;
-      color: var(--gold);
-      user-select: none;
-      border-bottom: 1px solid transparent;
-      transition: background .15s;
-    }
-    .picker-header:hover { background: rgba(201,162,39,.07); }
-    .picker-header.open  { border-bottom-color: #2a2a44; }
-    .picker-body { display: none; padding: .9rem 1rem 1rem; }
-    .picker-body.open { display: block; }
-
-    .picker-row {
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-      margin-bottom: .65rem;
-      flex-wrap: wrap;
-    }
-    .picker-lbl {
-      width: 56px;
-      font-size: .75rem;
-      color: var(--text-dim);
-      text-align: right;
-      flex-shrink: 0;
-    }
-    .picker-digits { display: flex; gap: .3rem; flex-wrap: wrap; }
-
-    .pd-btn {
-      width: 46px; height: 44px;
-      border-radius: 6px;
-      border: 2px solid transparent;
-      background: #141428;
-      color: #aaa;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: .9rem;
-      font-weight: bold;
-      font-family: 'Courier New', monospace;
-      transition: all .14s;
-      position: relative;
-    }
-    .pd-btn .pd-cnt {
-      font-size: .58rem;
-      font-family: sans-serif;
-      font-weight: normal;
-      color: rgba(255,255,255,.45);
-      line-height: 1;
-    }
-    /* 頻度に応じた背景色 */
-    .pd-f1 { background: #1e1e40; color: #9090d0; }
-    .pd-f2 { background: #3a2808; color: var(--gold); }
-    .pd-f3 { background: #5a3c04; color: var(--gold-lt); }
-    .pd-f4 { background: #7a5000; color: #fff; }
-    /* 選択状態 */
-    .pd-btn.chosen {
-      border-color: var(--gold);
-      box-shadow: 0 0 8px rgba(201,162,39,.5);
-      transform: scale(1.08);
-    }
-    .pd-btn:hover:not(.chosen) { border-color: #555; transform: scale(1.04); }
-
-    .picker-preview {
-      display: flex;
-      align-items: center;
-      gap: .8rem;
-      margin-top: .5rem;
-      padding-top: .65rem;
-      border-top: 1px solid #2a2a44;
-      flex-wrap: wrap;
-    }
-    .preview-num {
-      font-family: 'Courier New', monospace;
-      font-size: 1.8rem;
-      font-weight: bold;
-      color: var(--gold);
-      letter-spacing: .25em;
-      min-width: 100px;
-    }
-    .preview-num .blank { color: #333; }
-    .btn-apply {
-      padding: .45rem 1.1rem;
-      background: transparent;
-      border: 1px solid var(--gold);
-      color: var(--gold);
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: .82rem;
-      transition: all .18s;
-    }
-    .btn-apply:hover { background: rgba(201,162,39,.12); }
-    .btn-apply:disabled { opacity: .3; cursor: not-allowed; }
-    .btn-clear-pick {
-      padding: .4rem .8rem;
-      background: transparent;
-      border: 1px solid #444;
-      color: #666;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: .78rem;
-    }
-
-    /* インサイトリスト */
-    .insight-list { display: flex; flex-direction: column; gap: .6rem; }
-    .insight-row {
-      display: flex;
-      gap: .8rem;
-      align-items: baseline;
-      background: #111128;
-      border: 1px solid #2a2a44;
-      border-radius: 6px;
-      padding: .6rem .85rem;
-    }
-    .insight-pos {
-      font-size: .72rem;
-      color: var(--text-dim);
-      white-space: nowrap;
-      width: 74px;
-      flex-shrink: 0;
-    }
-    .insight-body { font-size: .85rem; line-height: 1.5; }
+    /* 傾向分析内部スタイル */
+    .trend-section { margin-bottom: 1.4rem; }
+    .trend-section h2 { font-size: .85rem; color: var(--gold); margin-bottom: .65rem; }
+    .history-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    .history-table th, .history-table td { border: 1px solid var(--brd); padding: .35rem .55rem; }
+    .history-table th { background: var(--bg3); color: var(--dim); font-weight: normal; }
+    .num-hl { font-family: 'Courier New', monospace; color: var(--gldt); font-weight: bold; }
+    .heatmap { display: flex; flex-direction: column; gap: .35rem; }
+    .heatmap-row { display: flex; align-items: center; gap: .35rem; }
+    .heatmap-lbl { width: 44px; font-size: .68rem; color: var(--dim); flex-shrink: 0; }
+    .heatmap-cells { display: flex; gap: .18rem; flex-wrap: wrap; }
+    .hm-cell { width: 34px; height: 34px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+    .hm-d { font-size: .85rem; font-weight: bold; }
+    .hm-c { font-size: .52rem; opacity: .7; }
+    .hm-0 { background: #111128; color: #444; }
+    .hm-1 { background: #2a1f60; color: #9090d0; }
+    .hm-2 { background: #6a4400; color: var(--gldt); }
+    .badge { display: inline-block; padding: .13rem .45rem; border-radius: 4px; font-size: .75rem; margin: .1rem; }
+    .badge.hot  { background: #3a2208; color: var(--gold); border: 1px solid var(--gold); }
+    .badge.cold { background: #111128; color: #5060a0; border: 1px solid #2a2a50; }
+    .insight-list { display: flex; flex-direction: column; gap: .45rem; }
+    .insight-row { display: flex; gap: .7rem; align-items: baseline; background: #111128; border: 1px solid var(--brd); border-radius: 6px; padding: .45rem .7rem; }
+    .insight-pos { font-size: .68rem; color: var(--dim); width: 68px; flex-shrink: 0; }
+    .insight-body { font-size: .8rem; line-height: 1.5; }
     .insight-body em { color: var(--gold); font-style: normal; }
+    .rec-box { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin-bottom: .6rem; }
+    .rec-num { font-family: 'Courier New', monospace; font-size: 2rem; color: var(--gold); letter-spacing: .3em; }
+    .btn-rec { background: none; border: 1px solid var(--gold); color: var(--gold); padding: .38rem .85rem; border-radius: 5px; cursor: pointer; font-size: .8rem; }
+    .btn-rec:hover { background: rgba(201,162,39,.12); }
+    .disclaimer { font-size: .7rem; color: var(--dim); line-height: 1.55; }
 
-    /* ─── エクスポート ─── */
-    .export-section {
-      text-align: center;
-      margin-top: 2rem;
-      padding-top: 1.2rem;
-      border-top: 1px solid #2a2a44;
-    }
-    .btn-export {
-      background: transparent;
-      border: 1px solid #5a7a5a;
-      color: #88bb88;
-      padding: .55rem 1.4rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: .88rem;
-      transition: all .18s;
-    }
-    .btn-export:hover { background: rgba(100,180,100,.1); border-color: #88bb88; }
-    .export-hint { font-size: .72rem; color: var(--text-dim); margin-top: .4rem; }
-
-    /* レスポンシブ */
-    @media (max-width: 560px) {
-      header h1 { font-size: 1.2rem; }
-      .digit-box { width: 52px; height: 68px; font-size: 1.8rem; }
-      .winning-input { width: 80px; font-size: 1.2rem; }
+    @media (max-width: 440px) {
+      .char-row { grid-template-columns: 1fr 58px 58px 28px; }
+      .win-row { gap: .45rem; }
+      .wi3 { width: 68px; } .wi2 { width: 52px; } .wi1 { width: 36px; }
     }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>⚔️ ノマドモグボナンザ 購入番号サポート</h1>
+  <h1>⚔️ ノマドモグボナンザ 購入記録</h1>
   <p>24周年記念（2026年）FF11 モグボナンザ</p>
 </header>
 
-<div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('sim')">🎯 番号を選ぶ</button>
-  <button class="tab-btn"        onclick="switchTab('trend')">📊 傾向分析</button>
-</div>
+<div class="main">
 
-<!-- ════════════════════════════════════════════════════ 抽選タブ -->
-<div id="tab-sim" class="tab-content active">
-  <div class="container">
-
-    <div class="info-bar">
-      <span>💰 玉1個: <strong>200,000ギル</strong></span>
-      <span>🛒 販売期間: <strong>5/14〜5/26</strong></span>
-      <span>📅 当選発表: <strong>6/24</strong></span>
-      <span>🎯 上限: <strong>1キャラ2個まで</strong></span>
+  <!-- STEP 1: 購入番号を入力 -->
+  <div class="step-card">
+    <div class="step-head">
+      <div class="step-num">1</div>
+      <div class="step-title">購入番号を入力</div>
+      <div class="step-sub">販売期間 5/14〜5/26 ／ 1キャラ最大2個</div>
     </div>
-
-    <div class="char-list" id="charList"></div>
-
-    <button class="btn-add-char" onclick="addChar()">＋ キャラクターを追加</button>
-
-    <div class="picker-panel" id="pickerPanel">
-      <div class="picker-header" id="pickerHeader" onclick="togglePicker()">
-        🎯 傾向から番号を選ぶ
-        <span id="pickerArrow">▼</span>
+    <div class="step-body">
+      <div class="char-rows" id="charList"></div>
+      <button class="btn-add" onclick="addChar()">＋ キャラクターを追加</button>
+      <div class="btn-row">
+        <button class="btn-save" onclick="exportMarkdown()">📋 Markdownで保存</button>
+        <label class="btn-load" for="mdFileInput">📂 ファイルから読み込む</label>
+        <input type="file" id="mdFileInput" accept=".md,.txt" onchange="importMarkdown(event)" style="display:none">
       </div>
-      <div class="picker-body" id="pickerBody"></div>
     </div>
+  </div>
 
-    <div class="verify-section">
-      <div class="verify-label">🏆 当選番号で照合</div>
-      <div class="verify-tier-row">
-        <div class="verify-tier-cell">
+  <!-- STEP 2: 当選番号で照合（6/24以降） -->
+  <div class="step-card">
+    <div class="step-head">
+      <div class="step-num">2</div>
+      <div class="step-title">当選番号で照合</div>
+      <div class="step-sub">📅 2026/6/24 発表後に使用</div>
+    </div>
+    <div class="step-body">
+      <div class="win-row">
+        <div class="win-cell">
           <label>1等（全3桁）</label>
-          <input type="text" id="win1" class="winning-input wi-3" maxlength="3" placeholder="000" inputmode="numeric">
+          <input type="text" id="win1" class="wi wi3" maxlength="3" placeholder="000" inputmode="numeric">
         </div>
-        <div class="verify-tier-cell">
+        <div class="win-cell">
           <label>2等（下2桁）</label>
-          <input type="text" id="win2" class="winning-input wi-2" maxlength="2" placeholder="00" inputmode="numeric">
+          <input type="text" id="win2" class="wi wi2" maxlength="2" placeholder="00" inputmode="numeric">
         </div>
-        <div class="verify-tier-cell">
+        <div class="win-cell">
           <label>3等（下1桁）</label>
-          <input type="text" id="win3" class="winning-input wi-1" maxlength="1" placeholder="0" inputmode="numeric">
+          <input type="text" id="win3" class="wi wi1" maxlength="1" placeholder="0" inputmode="numeric">
         </div>
-      </div>
-      <div class="verify-actions">
         <button class="btn-verify" onclick="startVerify()">照合する</button>
       </div>
-      <div class="verify-hint">📅 公式当選番号は 2026/6/24 発表予定</div>
+      <div id="resultSec"></div>
     </div>
-
-    <div class="winning-display" id="winDisp" style="display:none">
-      <div class="winning-label">当 選 番 号</div>
-      <div class="winning-digits">
-        <div class="digit-box" id="d0">?</div>
-        <div class="digit-box" id="d1">?</div>
-        <div class="digit-box" id="d2">?</div>
-      </div>
-      <div style="display:flex;justify-content:center;gap:2rem;margin-top:.5rem;font-size:.78rem;color:var(--text-dim);">
-        <span>2等: <span id="dispW2" style="color:var(--gold)">──</span></span>
-        <span>3等: <span id="dispW3" style="color:var(--gold)">─</span></span>
-      </div>
-    </div>
-
-    <div class="results-section" id="resultsSec"></div>
-
-    <div class="export-section">
-      <button class="btn-export" onclick="exportMarkdown()">📋 購入番号をMarkdownで保存</button>
-      <div class="export-hint">入力中のキャラ・番号を .md ファイルに書き出します</div>
-    </div>
-
-    <div class="import-section">
-      <label class="btn-import" for="mdFileInput">📂 Markdownファイルから読み込む</label>
-      <input type="file" id="mdFileInput" accept=".md,.txt" onchange="importMarkdown(event)" style="display:none">
-      <div class="export-hint" style="margin-top:.35rem">保存した .md ファイルを読み込んでキャラ・番号を復元</div>
-    </div>
-
   </div>
-</div>
 
-<!-- ════════════════════════════════════════════════════ 傾向分析タブ -->
-<div id="tab-trend" class="tab-content">
-  <div class="container">
-    <div id="trendBody"></div>
-  </div>
+  <!-- 傾向分析（折りたたみ） -->
+  <details>
+    <summary>📊 傾向分析（参考：過去13回データ）</summary>
+    <div class="trend-inner">
+      <div id="trendBody"></div>
+    </div>
+  </details>
+
 </div>
 
 <script>
 'use strict';
 
-// ────────────────────────────────────────────
-// 定数データ
-// ────────────────────────────────────────────
-
-const PRIZES = {
-  1: [
-    'アイスブランド','真オニオンソード','エアナイフ','真斬魔刀',
-    'ドラゴンファング','魔人の戦斧','ドラスティクアクス','真アルテミスの弓',
-    'ミラクルチアー','ラストシックル','賢者の杖','チョコボナイフ',
-    'フレイムタン','ダイアアスピス','河伯の槍','陸奥守吉行',
-    '真セイブザクイーン','プレミアムハート','真ブレイブブレイド','柳生の漆黒',
-    'エクゼター','ウィザードロッド','恵比寿釣竿'
-  ],
-  2: [
-    'クーポンA-OmII','クーポンAW-UWIII','クーポンAW-Vgr','クーポンAW-VgrII',
-    'クーポンW-Pulse','クーポンW-Job','クーポンAW-GeIV','クーポンI-RME',
-    'マリグナスシャポー','マリグナスタバード','マリグナスグローブ',
-    'マリグナスタイツ','マリグナスブーツ','マリグナスソード','マリグナスポール',
-    '無の面',
-    'クレパスクラヘルム','クレパスクラメイル','クレパスクラプリス',
-    'クレパスクラサイズ','クレパスクラナイフ',
-    'シェーパーケープ','太公望の釣竿',
-    'スローダタスラム','スローダネックレス','スローダピアス',
-    'スローダリング','スローダベルト'
-  ],
-  3: [
-    '無外装','無喉輪','無腰当',
-    '昏黄礫','昏黄耳飾り','昏黄指輪',
-    'マリグナスピアス',
-    '不倶戴天','タジャウジョシャン','オクーバクラウン','カラクールキャップ','オーラムコッファー',
-    'チョコボトルク','フィッシャトルク','木彫師のトルク','鍛冶師のトルク',
-    '彫金師のトルク','骨細工師のトルク','革細工師のトルク','裁縫師のトルク','調理師のトルク',
-    'オーパスシェルフ',
-    '翡翠のトルク','サファイアのトルク',
-    '宝箱（小）','宝箱（中）','宝箱（大）',
-    'ウェル'
-  ],
-  4: ['ボナンザボール']
-};
-
-const TIER_NAME  = { 1:'1等', 2:'2等', 3:'3等', 4:'4等（ハズレ）' };
-const TIER_CLASS = { 1:'tier-1', 2:'tier-2', 3:'tier-3', 4:'tier-4' };
+// ── 定数 ──────────────────────────────────────
 
 const HISTORY = [
   { year:'第3回 新春2021',  first:'397', second:'79', third:'1' },
@@ -757,75 +276,30 @@ const HISTORY = [
   { year:'第15回 新春2026', first:'021', second:'50', third:'9' },
 ];
 
-// ────────────────────────────────────────────
-// キャラ管理
-// ────────────────────────────────────────────
+// ── ユーティリティ ──────────────────────────────
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── キャラ管理 ─────────────────────────────────
 
 let uid = 0;
 
 function addChar(name = '', m1 = '', m2 = '') {
   const id = uid++;
   const div = document.createElement('div');
-  div.className = 'char-card';
+  div.className = 'char-card char-row';
   div.id = `char-${id}`;
   div.innerHTML = `
-    <div class="char-header">
-      <input class="char-name-input" type="text" placeholder="キャラ名（任意）" value="${escHtml(name)}">
-      <button class="btn-remove" onclick="removeChar(${id})">✕ 削除</button>
-    </div>
-    <div class="marbles-row">
-      <div class="marble-group">
-        <span class="marble-label">玉&nbsp;①</span>
-        <input class="marble-input" type="text" maxlength="3" placeholder="000" inputmode="numeric" value="${escHtml(m1)}">
-      </div>
-      <div class="marble-group">
-        <span class="marble-label">玉&nbsp;②</span>
-        <input class="marble-input" type="text" maxlength="3" placeholder="---" inputmode="numeric" value="${escHtml(m2)}">
-      </div>
-    </div>`;
+    <input class="char-name-input" type="text" placeholder="キャラ名" value="${escHtml(name)}">
+    <input class="marble-input mi" type="text" maxlength="3" placeholder="玉①" inputmode="numeric" value="${escHtml(m1)}">
+    <input class="marble-input mi" type="text" maxlength="3" placeholder="玉②" inputmode="numeric" value="${escHtml(m2)}">
+    <button class="btn-rm" onclick="removeChar(${id})">✕</button>`;
   div.querySelectorAll('.marble-input').forEach(el => {
     el.addEventListener('input', () => { el.value = el.value.replace(/\D/g,'').slice(0,3); });
   });
   document.getElementById('charList').appendChild(div);
-}
-
-// ────────────────────────────────────────────
-// Markdownファイル読み込み
-// ────────────────────────────────────────────
-
-function importMarkdown(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  event.target.value = ''; // 同ファイル再選択を可能にする
-  const reader = new FileReader();
-  reader.onload = e => parseAndLoadMarkdown(e.target.result);
-  reader.readAsText(file, 'UTF-8');
-}
-
-function parseAndLoadMarkdown(text) {
-  // ## 購入番号 テーブルを抽出
-  const section = text.match(/## 購入番号\n([\s\S]*?)(?:\n##|$)/);
-  if (!section) { alert('購入番号セクションが見つかりませんでした'); return; }
-
-  // テーブル行のみ抽出（ヘッダー行・区切り行を除く）
-  const rows = section[1]
-    .split('\n')
-    .filter(l => /^\|/.test(l) && !/^\|\s*[-|]+\s*$/.test(l) && !/キャラ/.test(l));
-
-  if (!rows.length) { alert('購入番号が見つかりませんでした'); return; }
-
-  document.getElementById('charList').innerHTML = '';
-
-  rows.forEach(row => {
-    const cells = row.split('|').map(c => c.trim()).filter(c => c.length);
-    if (!cells.length) return;
-    const name = cells[0] || '';
-    const m1 = (cells[1] || '').replace(/`|─|—/g, '').trim();
-    const m2 = (cells[2] || '').replace(/`|─|—/g, '').trim();
-    addChar(name, /^\d+$/.test(m1) ? m1 : '', /^\d+$/.test(m2) ? m2 : '');
-  });
-
-  alert(`✅ ${rows.length}キャラのデータを読み込みました`);
 }
 
 function removeChar(id) {
@@ -833,26 +307,18 @@ function removeChar(id) {
   if (el) el.remove();
 }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// ── 等級判定 ────────────────────────────────────
+// w1=1等3桁, w2=2等下2桁, w3=3等下1桁（独立した当選番号）
 
-// ────────────────────────────────────────────
-// 等級判定
-// ────────────────────────────────────────────
-
-// w1=1等3桁, w2=2等下2桁, w3=3等下1桁（それぞれ独立した当選番号）
 function checkTier(marble, w1, w2, w3) {
   const m = marble.padStart(3,'0');
-  if (m === w1)              return 1;
-  if (m.slice(1) === w2)     return 2;
-  if (m[2] === w3)           return 3;
+  if (m === w1)          return 1;
+  if (m.slice(1) === w2) return 2;
+  if (m[2] === w3)       return 3;
   return 4;
 }
 
-// ────────────────────────────────────────────
-// 抽選アニメーション
-// ────────────────────────────────────────────
+// ── 照合 ────────────────────────────────────────
 
 function startVerify() {
   const chars = document.querySelectorAll('.char-card');
@@ -861,319 +327,94 @@ function startVerify() {
   const r1 = document.getElementById('win1').value.trim();
   const r2 = document.getElementById('win2').value.trim();
   const r3 = document.getElementById('win3').value.trim();
-
   if (!/^\d{1,3}$/.test(r1)) { alert('1等番号（全3桁）を入力してください'); return; }
   if (!/^\d{1,2}$/.test(r2)) { alert('2等番号（下2桁）を入力してください'); return; }
   if (!/^\d$/.test(r3))      { alert('3等番号（下1桁）を入力してください'); return; }
 
-  const w1 = r1.padStart(3,'0');
-  const w2 = r2.padStart(2,'0');
-  const w3 = r3;
-
-  // 1等番号を大きく表示
-  const dEls = ['d0','d1','d2'].map(id => document.getElementById(id));
-  dEls.forEach((el, i) => { el.textContent = w1[i]; el.classList.remove('spin'); });
-  document.getElementById('dispW2').textContent = w2;
-  document.getElementById('dispW3').textContent = w3;
-  document.getElementById('winDisp').style.display = 'block';
-  document.getElementById('resultsSec').innerHTML = '';
-
-  showResults(w1, w2, w3);
+  showResults(r1.padStart(3,'0'), r2.padStart(2,'0'), r3);
 }
 
-// ────────────────────────────────────────────
-// 結果表示
-// ────────────────────────────────────────────
-
 function showResults(w1, w2, w3) {
-  const sec = document.getElementById('resultsSec');
+  const sec = document.getElementById('resultSec');
   sec.innerHTML = '';
+  let hits = 0;
 
-  let hitCount = 0;
-
+  // キャラごとに1行
+  const rows = [];
   document.querySelectorAll('.char-card').forEach(card => {
-    const name = card.querySelector('.char-name-input').value.trim() || 'キャラ';
-    card.querySelectorAll('.marble-input').forEach((inp, idx) => {
-      const val = inp.value.trim();
-      if (!val) return;
-
-      const marble = val.padStart(3,'0');
-      const tier   = checkTier(marble, w1, w2, w3);
-      if (tier < 4) hitCount++;
-
-      const div = document.createElement('div');
-      div.className = `result-card ${TIER_CLASS[tier]}`;
-      div.innerHTML = `
-        <div class="result-header">
-          <span class="tier-badge">${TIER_NAME[tier]}</span>
-          <span style="font-size:.88rem">${escHtml(name)}&nbsp;玉${idx+1}</span>
-          <span class="marble-vs">${matchHtml(marble, tier, w1, w2, w3)}</span>
-        </div>
-        ${tier < 4 ? `
-          <div style="color:var(--text-dim);font-size:.85rem;padding:.4rem 0;font-style:italic">
-            🗓️ 景品は当選発表（2026/6/24）後に確認できます
-          </div>
-        ` : `
-          <div style="color:var(--text-dim);font-size:.88rem;padding:.25rem 0">
-            🎱 ボナンザボール を獲得
-          </div>
-        `}`;
-      sec.appendChild(div);
-    });
+    const name = card.querySelector('.char-name-input').value.trim() || '名前なし';
+    const [inp1, inp2] = card.querySelectorAll('.marble-input');
+    const marbles = [inp1?.value.trim(), inp2?.value.trim()];
+    rows.push({ name, marbles });
   });
 
-  // 当選サマリー
-  if (hitCount > 0) {
+  const tbody = rows.map(({ name, marbles }) => {
+    const cells = marbles.map(v => {
+      if (!v) return '<td class="r4">─</td>';
+      const m    = v.padStart(3,'0');
+      const tier = checkTier(m, w1, w2, w3);
+      if (tier < 4) hits++;
+      const cls  = ['','r1','r2','r3','r4'][tier];
+      const label = ['','1等','2等','3等','─'][tier];
+      const markedM = markedHtml(m, tier);
+      return `<td class="${cls} mc">${markedM}<span class="tier-tag">${label}</span></td>`;
+    }).join('');
+    return `<tr><td>${escHtml(name)}</td>${cells}</tr>`;
+  }).join('');
+
+  sec.innerHTML = `
+    <table class="result-table">
+      <thead><tr><th>キャラ</th><th>玉①</th><th>玉②</th></tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
+
+  if (hits > 0) {
     const banner = document.createElement('div');
-    banner.style.cssText = 'text-align:center;margin:.8rem 0;padding:.6rem;background:#1a1a00;border:1px solid var(--gold);border-radius:6px;color:var(--gold);font-weight:bold;font-size:.92rem;';
-    banner.textContent = `🎉 ${hitCount}個 当選しています！`;
+    banner.className = 'result-banner';
+    banner.textContent = `🎉 ${hits}個 当選しています！`;
     sec.prepend(banner);
   }
 }
 
-function matchHtml(marble, tier, w1, w2, w3) {
+function markedHtml(marble, tier) {
   const m = marble.padStart(3,'0');
-  let html;
-  if (tier === 1) {
-    html = `<span style="color:var(--gold-lt);font-weight:bold">${m}</span>`;
-  } else if (tier === 2) {
-    html = `<span style="color:#555">${m[0]}</span><span style="color:var(--gold-lt);font-weight:bold">${m.slice(1)}</span>`;
-  } else if (tier === 3) {
-    html = `<span style="color:#555">${m.slice(0,2)}</span><span style="color:var(--gold-lt);font-weight:bold">${m[2]}</span>`;
-  } else {
-    html = `<span style="color:#555">${m}</span>`;
-  }
-  return html + `&nbsp;<span style="color:#444">vs</span>&nbsp;<span style="color:#888">${w1}</span>`;
+  if (tier === 1) return `<strong>${m}</strong>`;
+  if (tier === 2) return `<span style="opacity:.4">${m[0]}</span><strong>${m.slice(1)}</strong>`;
+  if (tier === 3) return `<span style="opacity:.4">${m.slice(0,2)}</span><strong>${m[2]}</strong>`;
+  return `<span style="opacity:.35">${m}</span>`;
 }
 
-function pickRand(pid) {
-  const grid  = document.getElementById(pid);
-  const chips = grid.querySelectorAll('.prize-chip');
-  chips.forEach(c => c.classList.remove('chosen'));
-  const pick = chips[Math.floor(Math.random() * chips.length)];
-  pick.classList.add('chosen');
-  pick.scrollIntoView({ behavior:'smooth', block:'nearest' });
-}
-
-// ────────────────────────────────────────────
-// タブ切り替え
-// ────────────────────────────────────────────
-
-function switchTab(id) {
-  ['sim','trend'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('active', t === id);
-  });
-  document.querySelectorAll('.tab-btn').forEach((b, i) =>
-    b.classList.toggle('active', ['sim','trend'][i] === id));
-  if (id === 'trend') buildTrend();
-}
-
-// ────────────────────────────────────────────
-// 傾向分析
-// ────────────────────────────────────────────
-
-function digitFreq() {
-  const freq = [{},{},{}];
-  for (let d = 0; d <= 9; d++) [0,1,2].forEach(i => { freq[i][d] = 0; });
-  HISTORY.forEach(h => {
-    h.first.padStart(3,'0').split('').forEach((ch, i) => { freq[i][ch] = (freq[i][ch]||0) + 1; });
-  });
-  return freq;
-}
-
-function buildTrend() {
-  const freq   = digitFreq();
-  const posLbl = ['百の位','十の位','一の位'];
-  const maxF   = Math.max(...freq.flatMap(f => Object.values(f)));
-
-  // 過去当選テーブル
-  const rows = HISTORY.map(h =>
-    `<tr>
-       <td>${h.year}</td>
-       <td><span class="num-hl">${h.first}</span></td>
-       <td>${h.second}</td>
-       <td>${h.third}</td>
-     </tr>`
-  ).join('');
-
-  // ヒートマップ
-  const hmRows = freq.map((f, pi) => {
-    const cells = Object.entries(f).map(([d, cnt]) => {
-      const ratio = maxF > 0 ? cnt / maxF : 0;
-      const cls   = ratio === 0 ? 'hm-0' : ratio <= .5 ? 'hm-1' : 'hm-2';
-      return `<div class="hm-cell ${cls}"><span class="hm-d">${d}</span><span class="hm-c">${cnt}回</span></div>`;
-    }).join('');
-    return `<div class="heatmap-row"><span class="heatmap-lbl">${posLbl[pi]}</span><div class="heatmap-cells">${cells}</div></div>`;
-  }).join('');
-
-  // ホット/コールド
-  const hcHtml = freq.map((f, pi) => {
-    const max  = Math.max(...Object.values(f));
-    const hot  = Object.keys(f).filter(k => f[k] === max && max > 0);
-    const cold = Object.keys(f).filter(k => f[k] === 0);
-    const coldDisp = cold.length > 5
-      ? cold.slice(0,5).map(d=>`<span class="badge cold">❄ ${d}</span>`).join('') + `<span style="font-size:.72rem;color:var(--text-dim)"> 他${cold.length-5}個</span>`
-      : cold.map(d=>`<span class="badge cold">❄ ${d}</span>`).join('');
-    return `<div style="margin-bottom:.6rem">
-      <span style="font-size:.78rem;color:var(--text-dim)">${posLbl[pi]}：</span>
-      ${hot.map(d=>`<span class="badge hot">🔥 ${d}</span>`).join('')}
-      ${coldDisp}
-    </div>`;
-  }).join('');
-
-  // ── インサイト生成 ──
-  const n = HISTORY.length;
-  const insightItems = [];
-
-  // 各桁でトップの数字と出現率を調べてコメント化
-  freq.forEach((f, pi) => {
-    const max  = Math.max(...Object.values(f));
-    const hot  = Object.keys(f).filter(k => f[k] === max);
-    const pct  = Math.round(max / n * 100);
-    const lbl  = ['百の位','十の位','一の位'][pi];
-    const theory = 10;
-    if (max >= 2) {
-      const ratio = (pct / theory).toFixed(1);
-      insightItems.push(
-        `<div class="insight-row">
-          <span class="insight-pos">${lbl}</span>
-          <span class="insight-body">
-            <strong style="color:var(--gold-lt)">${hot.join(' / ')}</strong> が
-            ${max}/${n}回 <em>(${pct}%)</em> 出現 ─ 理論値(10%)の約${ratio}倍
-          </span>
-        </div>`
-      );
-    }
-  });
-
-  // 百の位+十の位の組み合わせトップ
-  const combos = {};
-  HISTORY.forEach(h => {
-    const k = h.first.padStart(3,'0').slice(0,2);
-    combos[k] = (combos[k] || 0) + 1;
-  });
-  const topCombo = Object.entries(combos).sort((a,b) => b[1]-a[1])[0];
-  if (topCombo[1] >= 2) {
-    insightItems.push(
-      `<div class="insight-row">
-        <span class="insight-pos">上2桁</span>
-        <span class="insight-body">
-          <strong style="color:var(--gold-lt)">${topCombo[0]}X</strong> が
-          ${topCombo[1]}/${n}回出現（${Math.round(topCombo[1]/n*100)}%）─ 最多の上2桁パターン
-        </span>
-      </div>`
-    );
-  }
-
-  // 3等一の位
-  const thirdFreq = {};
-  for (let d=0; d<=9; d++) thirdFreq[d] = 0;
-  HISTORY.forEach(h => { const d = h.third.slice(-1); thirdFreq[d]++; });
-  const thirdMax  = Math.max(...Object.values(thirdFreq));
-  const thirdHot  = Object.keys(thirdFreq).filter(k => thirdFreq[k] === thirdMax);
-  insightItems.push(
-    `<div class="insight-row">
-      <span class="insight-pos">3等(一の位)</span>
-      <span class="insight-body">
-        <strong style="color:var(--bronze)">${thirdHot.join(' / ')}</strong> が各${thirdMax}回出現
-        ─ 下1桁が一致すると3等。一の位選択の参考に
-      </span>
-    </div>`
-  );
-
-  const insightHtml = `
-    <div class="insight-list">${insightItems.join('')}</div>`;
-
-  document.getElementById('trendBody').innerHTML = `
-    <div class="trend-section">
-      <h2>📋 過去の当選番号（参考）</h2>
-      <table class="history-table">
-        <thead><tr><th>回</th><th>1等（全3桁）</th><th>2等（下2桁）</th><th>3等（下1桁）</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-
-    <div class="trend-section">
-      <h2>🌡 桁別出現頻度ヒートマップ（1等 全${HISTORY.length}回）</h2>
-      <div class="heatmap">${hmRows}</div>
-      <div style="font-size:.72rem;color:var(--text-dim);margin-top:.5rem">
-        🟣 薄紫=1回出現　🟠 オレンジ=最頻出
-      </div>
-    </div>
-
-    <div class="trend-section">
-      <h2>🔥 ホット / ❄ コールド数字</h2>
-      ${hcHtml}
-    </div>
-
-    <div class="trend-section">
-      <h2>💡 注目インサイト（全${HISTORY.length}回 分析）</h2>
-      ${insightHtml}
-    </div>
-
-    <div class="trend-section">
-      <h2>🎯 おすすめ番号（傾向ベース）</h2>
-      <div class="rec-box">
-        <div style="font-size:.82rem;color:var(--text-dim)">各桁の最頻出数字を採用（同率の場合はランダム）</div>
-        <span class="rec-num" id="recNum">─ ─ ─</span>
-        <button class="btn-rec" onclick="genRec()">おすすめ番号を生成</button>
-      </div>
-      <div class="disclaimer">
-        ⚠️ このデータはエンタメ目的です。ボナンザの抽選は真のランダムであり、過去の当選番号は次回の結果に一切影響しません。
-        ${HISTORY.length}回分のサンプルでも真のランダム抽選に対して統計的有意性はありません。あくまでも参考程度にお楽しみください。
-      </div>
-    </div>`;
-}
-
-function genRec() {
-  const freq = digitFreq();
-  const rec  = freq.map(f => {
-    const max = Math.max(...Object.values(f));
-    const hot = Object.keys(f).filter(k => f[k] === max);
-    return hot[Math.floor(Math.random() * hot.length)];
-  }).join('');
-  document.getElementById('recNum').textContent = rec.split('').join(' ');
-}
-
-// ────────────────────────────────────────────
-// Markdownエクスポート
-// ────────────────────────────────────────────
+// ── Markdownエクスポート ────────────────────────
 
 function exportMarkdown() {
-  const now    = new Date();
+  const now     = new Date();
   const dateStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
   const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   const fname   = `bonanza_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.md`;
 
-  // キャラ・玉データ収集
   const chars = [];
   document.querySelectorAll('.char-card').forEach(card => {
     const name    = card.querySelector('.char-name-input').value.trim() || '（名前なし）';
     const inputs  = card.querySelectorAll('.marble-input');
-    const marble1 = inputs[0]?.value.trim().padStart(3,'0') || '---';
-    const marble2 = inputs[1]?.value.trim() ? inputs[1].value.trim().padStart(3,'0') : '---';
+    const marble1 = inputs[0]?.value.trim() ? inputs[0].value.trim().padStart(3,'0') : null;
+    const marble2 = inputs[1]?.value.trim() ? inputs[1].value.trim().padStart(3,'0') : null;
     chars.push({ name, marble1, marble2 });
   });
 
-  if (chars.length === 0 || chars.every(c => c.marble1 === '---' && c.marble2 === '---')) {
-    alert('玉番号が入力されていません');
-    return;
-  }
+  if (!chars.some(c => c.marble1 || c.marble2)) { alert('玉番号が入力されていません'); return; }
 
-  // 傾向サマリー
-  const freq   = digitFreq();
-  const posLbl = ['百の位', '十の位', '一の位'];
+  const tableRows = chars.map(c =>
+    `| ${c.name} | ${c.marble1 ? `\`${c.marble1}\`` : '─'} | ${c.marble2 ? `\`${c.marble2}\`` : '─'} |`
+  ).join('\n');
+
+  const freq    = digitFreq();
+  const posLbl  = ['百の位','十の位','一の位'];
   const trendLines = freq.map((f, pi) => {
     const max = Math.max(...Object.values(f));
     const hot = Object.keys(f).filter(k => f[k] === max && max > 0);
     const pct = Math.round(max / HISTORY.length * 100);
     return `- ${posLbl[pi]}: \`${hot.join(' / ')}\` が最頻出（${max}/${HISTORY.length}回, ${pct}%）`;
   }).join('\n');
-
-  // テーブル行
-  const tableRows = chars.map(c =>
-    `| ${c.name} | ${c.marble1 !== '---' ? `\`${c.marble1}\`` : '─'} | ${c.marble2 !== '---' ? `\`${c.marble2}\`` : '─'} |`
-  ).join('\n');
 
   const md = `# ノマドモグボナンザ 購入記録
 
@@ -1207,133 +448,159 @@ ${trendLines}
 ${HISTORY.map(h => `| ${h.year} | \`${h.first}\` | ${h.second} | ${h.third} |`).join('\n')}
 `;
 
-  // ダウンロード
   const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href     = url;
-  a.download = fname;
-  a.click();
+  a.href = url; a.download = fname; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-// ────────────────────────────────────────────
-// 傾向ピッカー
-// ────────────────────────────────────────────
+// ── Markdownインポート ──────────────────────────
 
-const pickerSel = [null, null, null]; // 選択中の桁 [百,十,一]
-
-function togglePicker() {
-  const body   = document.getElementById('pickerBody');
-  const header = document.getElementById('pickerHeader');
-  const arrow  = document.getElementById('pickerArrow');
-  const isOpen = body.classList.contains('open');
-  body.classList.toggle('open', !isOpen);
-  header.classList.toggle('open', !isOpen);
-  arrow.textContent = isOpen ? '▼' : '▲';
-  if (!isOpen && !body.hasChildNodes()) buildPickerUI();
+function importMarkdown(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+  const reader = new FileReader();
+  reader.onload = e => parseAndLoadMarkdown(e.target.result);
+  reader.readAsText(file, 'UTF-8');
 }
 
-function buildPickerUI() {
-  const freq    = digitFreq();
-  const posLbls = ['百の位', '十の位', '一の位'];
-  const maxF    = Math.max(...freq.flatMap(f => Object.values(f)));
+function parseAndLoadMarkdown(text) {
+  const section = text.match(/## 購入番号\n([\s\S]*?)(?:\n##|$)/);
+  if (!section) { alert('購入番号セクションが見つかりませんでした'); return; }
 
-  let html = '';
-  freq.forEach((f, pi) => {
-    // 頻度順にソート（同率は数字の小さい順）
-    const sorted = Object.entries(f)
-      .sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  const rows = section[1]
+    .split('\n')
+    .filter(l => /^\|/.test(l) && !/^\|\s*[-|]+\s*$/.test(l) && !/キャラ/.test(l));
 
-    const buttons = sorted.map(([d, cnt]) => {
-      const lvl = cnt === 0 ? 0 : cnt === 1 ? 1 : cnt <= 2 ? 2 : cnt <= 3 ? 3 : 4;
-      return `<button class="pd-btn pd-f${lvl}" data-pos="${pi}" data-digit="${d}"
-                onclick="pickDigit(${pi},'${d}')">
-                ${d}<span class="pd-cnt">${cnt}回</span>
-              </button>`;
+  if (!rows.length) { alert('購入番号が見つかりませんでした'); return; }
+
+  document.getElementById('charList').innerHTML = '';
+  rows.forEach(row => {
+    const cells = row.split('|').map(c => c.trim()).filter(c => c.length);
+    if (!cells.length) return;
+    const name = cells[0] || '';
+    const m1 = (cells[1] || '').replace(/`|─|—/g, '').trim();
+    const m2 = (cells[2] || '').replace(/`|─|—/g, '').trim();
+    addChar(name, /^\d+$/.test(m1) ? m1 : '', /^\d+$/.test(m2) ? m2 : '');
+  });
+  alert(`✅ ${rows.length}キャラのデータを読み込みました`);
+}
+
+// ── 傾向分析 ────────────────────────────────────
+
+function digitFreq() {
+  const freq = [{},{},{}];
+  for (let d = 0; d <= 9; d++) [0,1,2].forEach(i => { freq[i][d] = 0; });
+  HISTORY.forEach(h => {
+    h.first.padStart(3,'0').split('').forEach((ch, i) => { freq[i][ch] = (freq[i][ch]||0) + 1; });
+  });
+  return freq;
+}
+
+// 傾向分析 details が開かれたときに1回だけビルド
+let trendBuilt = false;
+document.querySelector('details').addEventListener('toggle', function() {
+  if (this.open && !trendBuilt) { buildTrend(); trendBuilt = true; }
+});
+
+function buildTrend() {
+  const freq   = digitFreq();
+  const posLbl = ['百の位','十の位','一の位'];
+  const maxF   = Math.max(...freq.flatMap(f => Object.values(f)));
+  const n      = HISTORY.length;
+
+  const histRows = HISTORY.map(h =>
+    `<tr><td>${h.year}</td><td><span class="num-hl">${h.first}</span></td><td>${h.second}</td><td>${h.third}</td></tr>`
+  ).join('');
+
+  const hmRows = freq.map((f, pi) => {
+    const cells = Object.entries(f).map(([d, cnt]) => {
+      const ratio = maxF > 0 ? cnt / maxF : 0;
+      const cls   = ratio === 0 ? 'hm-0' : ratio <= .5 ? 'hm-1' : 'hm-2';
+      return `<div class="hm-cell ${cls}"><span class="hm-d">${d}</span><span class="hm-c">${cnt}回</span></div>`;
     }).join('');
+    return `<div class="heatmap-row"><span class="heatmap-lbl">${posLbl[pi]}</span><div class="heatmap-cells">${cells}</div></div>`;
+  }).join('');
 
-    html += `<div class="picker-row">
-      <span class="picker-lbl">${posLbls[pi]}</span>
-      <div class="picker-digits" id="pdRow${pi}">${buttons}</div>
+  const hcHtml = freq.map((f, pi) => {
+    const max  = Math.max(...Object.values(f));
+    const hot  = Object.keys(f).filter(k => f[k] === max && max > 0);
+    const cold = Object.keys(f).filter(k => f[k] === 0);
+    const coldDisp = cold.length > 5
+      ? cold.slice(0,5).map(d=>`<span class="badge cold">❄ ${d}</span>`).join('') + `<span style="font-size:.7rem;color:var(--dim)"> 他${cold.length-5}個</span>`
+      : cold.map(d=>`<span class="badge cold">❄ ${d}</span>`).join('');
+    return `<div style="margin-bottom:.55rem">
+      <span style="font-size:.75rem;color:var(--dim)">${posLbl[pi]}：</span>
+      ${hot.map(d=>`<span class="badge hot">🔥 ${d}</span>`).join('')}
+      ${coldDisp}
     </div>`;
-  });
+  }).join('');
 
-  html += `<div class="picker-preview">
-    <span class="preview-num" id="prevNum">
-      <span id="pn0" class="blank">?</span>
-      <span id="pn1" class="blank">?</span>
-      <span id="pn2" class="blank">?</span>
-    </span>
-    <button class="btn-apply" id="btnApply" onclick="applyPicker()" disabled>
-      空き玉番号に適用
-    </button>
-    <button class="btn-clear-pick" onclick="clearPicker()">クリア</button>
-  </div>`;
-
-  document.getElementById('pickerBody').innerHTML = html;
-}
-
-function pickDigit(pos, digit) {
-  // 同じ桁を再クリックで解除
-  pickerSel[pos] = pickerSel[pos] === digit ? null : digit;
-
-  // ボタン選択状態更新
-  document.querySelectorAll(`#pdRow${pos} .pd-btn`).forEach(btn => {
-    btn.classList.toggle('chosen', btn.dataset.digit === pickerSel[pos]);
-  });
-
-  // プレビュー更新
-  ['pn0','pn1','pn2'].forEach((id, i) => {
-    const el = document.getElementById(id);
-    if (pickerSel[i] !== null) {
-      el.textContent = pickerSel[i];
-      el.classList.remove('blank');
-    } else {
-      el.textContent = '?';
-      el.classList.add('blank');
+  const insightItems = [];
+  freq.forEach((f, pi) => {
+    const max = Math.max(...Object.values(f));
+    const hot = Object.keys(f).filter(k => f[k] === max);
+    const pct = Math.round(max / n * 100);
+    if (max >= 2) {
+      insightItems.push(`<div class="insight-row">
+        <span class="insight-pos">${posLbl[pi]}</span>
+        <span class="insight-body"><strong style="color:var(--gldt)">${hot.join(' / ')}</strong> が ${max}/${n}回 <em>(${pct}%)</em> — 理論値(10%)の約${(pct/10).toFixed(1)}倍</span>
+      </div>`);
     }
   });
+  const thirdFreq = {};
+  for (let d=0; d<=9; d++) thirdFreq[d] = 0;
+  HISTORY.forEach(h => { thirdFreq[h.third.slice(-1)]++; });
+  const thirdMax = Math.max(...Object.values(thirdFreq));
+  const thirdHot = Object.keys(thirdFreq).filter(k => thirdFreq[k] === thirdMax);
+  insightItems.push(`<div class="insight-row">
+    <span class="insight-pos">3等(一の位)</span>
+    <span class="insight-body"><strong style="color:var(--t3c)">${thirdHot.join(' / ')}</strong> が各${thirdMax}回 — 下1桁の参考に</span>
+  </div>`);
 
-  // 適用ボタン：1桁以上選択されていれば有効
-  document.getElementById('btnApply').disabled = pickerSel.every(v => v === null);
+  document.getElementById('trendBody').innerHTML = `
+    <div class="trend-section">
+      <h2>📋 過去の当選番号</h2>
+      <table class="history-table">
+        <thead><tr><th>回</th><th>1等（全3桁）</th><th>2等（下2桁）</th><th>3等（下1桁）</th></tr></thead>
+        <tbody>${histRows}</tbody>
+      </table>
+    </div>
+    <div class="trend-section">
+      <h2>🌡 桁別出現頻度（1等 全${n}回）</h2>
+      <div class="heatmap">${hmRows}</div>
+    </div>
+    <div class="trend-section">
+      <h2>🔥 ホット / ❄ コールド</h2>
+      ${hcHtml}
+    </div>
+    <div class="trend-section">
+      <h2>💡 インサイト</h2>
+      <div class="insight-list">${insightItems.join('')}</div>
+    </div>
+    <div class="trend-section">
+      <h2>🎯 傾向ベースのおすすめ番号</h2>
+      <div class="rec-box">
+        <span class="rec-num" id="recNum">─ ─ ─</span>
+        <button class="btn-rec" onclick="genRec()">生成する</button>
+      </div>
+      <div class="disclaimer">⚠️ このデータはエンタメ目的です。ボナンザの抽選は真のランダムであり、過去の番号は次回の結果に一切影響しません。</div>
+    </div>`;
 }
 
-function applyPicker() {
-  // 選択されていない桁はランダム
-  const num = pickerSel.map(v => v !== null ? v : String(Math.floor(Math.random() * 10))).join('');
-
-  // 最初の空き marble-input に入力
-  const inputs = document.querySelectorAll('.marble-input');
-  for (const inp of inputs) {
-    if (!inp.value.trim()) {
-      inp.value = num;
-      inp.focus();
-      inp.style.transition = 'box-shadow .3s';
-      inp.style.boxShadow  = '0 0 10px rgba(201,162,39,.8)';
-      setTimeout(() => { inp.style.boxShadow = ''; }, 800);
-      return;
-    }
-  }
-  // 全て埋まっていれば最後のに上書き
-  const last = inputs[inputs.length - 1];
-  if (last) { last.value = num; last.focus(); }
+function genRec() {
+  const freq = digitFreq();
+  const rec  = freq.map(f => {
+    const max = Math.max(...Object.values(f));
+    const hot = Object.keys(f).filter(k => f[k] === max);
+    return hot[Math.floor(Math.random() * hot.length)];
+  }).join('');
+  document.getElementById('recNum').textContent = rec.split('').join(' ');
 }
 
-function clearPicker() {
-  pickerSel.fill(null);
-  document.querySelectorAll('.pd-btn').forEach(b => b.classList.remove('chosen'));
-  ['pn0','pn1','pn2'].forEach(id => {
-    const el = document.getElementById(id);
-    el.textContent = '?';
-    el.classList.add('blank');
-  });
-  document.getElementById('btnApply').disabled = true;
-}
-
-// ────────────────────────────────────────────
-// 初期化
-// ────────────────────────────────────────────
+// ── 初期化 ──────────────────────────────────────
 addChar();
 </script>
 </body>
