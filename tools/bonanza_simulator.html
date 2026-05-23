@@ -70,6 +70,12 @@
       letter-spacing: .08em; color: var(--gldt);
     }
     .mi::placeholder { color: #333; letter-spacing: 0; }
+    .mi.dup { border-color: #cc4444 !important; color: #ff8888; box-shadow: 0 0 6px rgba(200,60,60,.4); }
+    .dup-warn {
+      font-size: .73rem; color: #ff7777;
+      background: rgba(180,40,40,.12); border: 1px solid #aa3333;
+      border-radius: 5px; padding: .3rem .65rem; margin-bottom: .45rem;
+    }
     .btn-rm {
       background: none; border: 1px solid #333; color: #555;
       border-radius: 4px; cursor: pointer; font-size: .7rem;
@@ -258,6 +264,7 @@
     </div>
     <div class="step-body">
       <div class="char-rows" id="charList"></div>
+      <div class="dup-warn" id="dupWarn" style="display:none">⚠️ 同じ番号が複数のキャラに入力されています</div>
       <button class="btn-add" onclick="addChar()">＋ キャラクターを追加</button>
 
       <!-- 番号選びサポート（折りたたみ） -->
@@ -368,14 +375,14 @@ function addChar(name = '', m1 = '', m2 = '') {
     <input class="marble-input mi" type="text" maxlength="3" placeholder="玉②" inputmode="numeric" value="${escHtml(m2)}">
     <button class="btn-rm" onclick="removeChar(${id})">✕</button>`;
   div.querySelectorAll('.marble-input').forEach(el => {
-    el.addEventListener('input', () => { el.value = el.value.replace(/\D/g,'').slice(0,3); });
+    el.addEventListener('input', () => { el.value = el.value.replace(/\D/g,'').slice(0,3); checkDuplicates(); });
   });
   document.getElementById('charList').appendChild(div);
 }
 
 function removeChar(id) {
   const el = document.getElementById(`char-${id}`);
-  if (el) el.remove();
+  if (el) { el.remove(); checkDuplicates(); }
 }
 
 // ── 等級判定 ────────────────────────────────────
@@ -690,11 +697,28 @@ function fillNextMarble(num) {
     if (!inp.value.trim()) {
       inp.value = num;
       flash(inp);
+      checkDuplicates();
       return;
     }
   }
   const last = inputs[inputs.length - 1];
-  if (last) { last.value = num; flash(last); }
+  if (last) { last.value = num; flash(last); checkDuplicates(); }
+}
+
+function checkDuplicates() {
+  const inputs = [...document.querySelectorAll('.marble-input')];
+  const filled = inputs.map(inp => {
+    const v = inp.value.trim();
+    return v ? v.padStart(3, '0') : '';
+  });
+  let hasDup = false;
+  inputs.forEach((inp, i) => {
+    if (!filled[i]) { inp.classList.remove('dup'); return; }
+    const isDup = filled.some((v, j) => j !== i && v === filled[i]);
+    inp.classList.toggle('dup', isDup);
+    if (isDup) hasDup = true;
+  });
+  document.getElementById('dupWarn').style.display = hasDup ? 'block' : 'none';
 }
 
 function flash(el) {
