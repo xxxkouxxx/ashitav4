@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ノマドモグボナンザ 抽選シミュレーター</title>
+  <title>ノマドモグボナンザ 購入番号サポート</title>
   <style>
     :root {
       --bg:        #0d0d1a;
@@ -519,12 +519,12 @@
 <body>
 
 <header>
-  <h1>⚔️ ノマドモグボナンザ 抽選シミュレーター</h1>
+  <h1>⚔️ ノマドモグボナンザ 購入番号サポート</h1>
   <p>24周年記念（2026年）FF11 モグボナンザ</p>
 </header>
 
 <div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('sim')">🎲 抽選シミュレーター</button>
+  <button class="tab-btn active" onclick="switchTab('sim')">🎯 番号を選ぶ</button>
   <button class="tab-btn"        onclick="switchTab('trend')">📊 傾向分析</button>
 </div>
 
@@ -763,10 +763,9 @@ function showResults(winning) {
           <span class="marble-vs">${matchHtml(marble, winning)}</span>
         </div>
         ${tier < 4 ? `
-          <div class="prize-grid" id="${pid}">
-            ${PRIZES[tier].map(p=>`<span class="prize-chip">${escHtml(p)}</span>`).join('')}
+          <div style="color:var(--text-dim);font-size:.85rem;padding:.4rem 0;font-style:italic">
+            🗓️ 景品は当選発表（2026/6/24）後に確認できます
           </div>
-          <button class="btn-rand-prize" onclick="pickRand('${pid}')">🎲 ランダム景品を選ぶ</button>
         ` : `
           <div style="color:var(--text-dim);font-size:.88rem;padding:.25rem 0">
             🎱 ボナンザボール を獲得
