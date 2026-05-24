@@ -189,6 +189,22 @@
     .btn-rec { background: none; border: 1px solid var(--gold); color: var(--gold); padding: .38rem .85rem; border-radius: 5px; cursor: pointer; font-size: .8rem; }
     .btn-rec:hover { background: rgba(201,162,39,.12); }
     .disclaimer { font-size: .7rem; color: var(--dim); line-height: 1.55; }
+    .trend-ref-link { display: inline-flex; align-items: center; gap: .35rem; font-size: .75rem; color: #88aacc; text-decoration: none; border: 1px solid #4a6a7a; border-radius: 4px; padding: .28rem .6rem; transition: all .15s; }
+    .trend-ref-link:hover { background: rgba(100,150,200,.1); color: #aaccee; }
+
+    /* ─── 新回追加フォーム ─── */
+    .add-hist-form { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; margin-bottom: .4rem; }
+    .ah-inp { background: var(--bg); border: 1px solid var(--brd); border-radius: 5px; color: var(--text); padding: .35rem .5rem; font-size: .82rem; outline: none; transition: border-color .15s; }
+    .ah-inp:focus { border-color: var(--gold); }
+    .ah-wide  { flex: 1; min-width: 140px; }
+    .ah-num   { width: 64px !important; font-family: 'Courier New', monospace; text-align: center; color: var(--gldt); flex-shrink: 0; }
+    .ah-num2  { width: 52px !important; font-family: 'Courier New', monospace; text-align: center; color: var(--gldt); flex-shrink: 0; }
+    .ah-num1  { width: 40px !important; font-family: 'Courier New', monospace; text-align: center; color: var(--gldt); flex-shrink: 0; }
+    .btn-add-hist { background: none; border: 1px solid #5a7a5a; color: #88bb88; padding: .35rem .75rem; border-radius: 5px; cursor: pointer; font-size: .8rem; transition: all .15s; white-space: nowrap; }
+    .btn-add-hist:hover { background: rgba(100,180,100,.1); }
+    .add-hist-note { font-size: .68rem; color: var(--dim); }
+    .toast { position: fixed; bottom: 1.2rem; left: 50%; transform: translateX(-50%); background: #1a2a1a; border: 1px solid #5a9a5a; color: #aaddaa; padding: .55rem 1.2rem; border-radius: 7px; font-size: .82rem; pointer-events: none; opacity: 0; transition: opacity .25s; z-index: 9999; white-space: nowrap; }
+    .toast.show { opacity: 1; }
 
     /* ─── 番号選びサポートパネル ─── */
     .support-panel { margin: .55rem 0 0; }
@@ -247,6 +263,8 @@
   </style>
 </head>
 <body>
+
+<div class="toast" id="toast"></div>
 
 <header>
   <h1>⚔️ ノマドモグボナンザ 購入記録</h1>
@@ -663,9 +681,50 @@ function buildTrend() {
       <div class="rec-box">
         <span class="rec-num" id="recNum">─ ─ ─</span>
         <button class="btn-rec" onclick="genRec()">生成する</button>
+        <a class="trend-ref-link" href="https://nazo.main.jp/games/ff11/mbnog5.html#data" target="_blank" rel="noopener">📖 nazo.main.jp で詳細分析</a>
       </div>
       <div class="disclaimer">⚠️ このデータはエンタメ目的です。ボナンザの抽選は真のランダムであり、過去の番号は次回の結果に一切影響しません。</div>
+    </div>
+    <div class="trend-section">
+      <h2>➕ 新しい回のデータを追加</h2>
+      <div class="add-hist-form">
+        <input id="ahYear"  type="text" placeholder="例：第16回 24周年" class="ah-inp ah-wide">
+        <input id="ahFirst" type="text" maxlength="3" placeholder="1等（3桁）" class="ah-inp ah-num" inputmode="numeric">
+        <input id="ahSec"   type="text" maxlength="2" placeholder="2等（2桁）" class="ah-inp ah-num2" inputmode="numeric">
+        <input id="ahThird" type="text" maxlength="1" placeholder="3等（1桁）" class="ah-inp ah-num1" inputmode="numeric">
+        <button class="btn-add-hist" onclick="addHistory()">追加</button>
+      </div>
+      <p class="add-hist-note">追加したデータはページを閉じるとリセットされます（永続化はMarkdown保存を利用）</p>
     </div>`;
+}
+
+let _toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function addHistory() {
+  const year  = document.getElementById('ahYear').value.trim();
+  const first = document.getElementById('ahFirst').value.trim();
+  const sec   = document.getElementById('ahSec').value.trim();
+  const third = document.getElementById('ahThird').value.trim();
+  if (!year)                    { showToast('⚠️ 回名を入力してください'); return; }
+  if (!/^\d{1,3}$/.test(first)) { showToast('⚠️ 1等番号（3桁）を入力してください'); return; }
+  if (!/^\d{1,2}$/.test(sec))   { showToast('⚠️ 2等番号（2桁）を入力してください'); return; }
+  if (!/^\d$/.test(third))      { showToast('⚠️ 3等番号（1桁）を入力してください'); return; }
+  HISTORY.push({ year, first: first.padStart(3,'0'), second: sec.padStart(2,'0'), third });
+  // サポートパネルのピッカーが開いていれば再構築
+  if (document.getElementById('pickerRows').hasChildNodes()) buildPickerUI();
+  // 傾向分析を再描画
+  trendBuilt = false;
+  buildTrend();
+  // 入力クリア
+  ['ahYear','ahFirst','ahSec','ahThird'].forEach(id => { document.getElementById(id).value = ''; });
+  showToast(`✅ 「${year}」を追加しました（合計 ${HISTORY.length} 回）`);
 }
 
 function genRec() {
