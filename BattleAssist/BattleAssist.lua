@@ -58,51 +58,59 @@ local function has_buff(buff_id)
 end
 
 -- ============================================================
--- リキャストタイマー定義（バフ消滅時にソフトウェア計測で開始）
--- recast: デフォルトのリキャスト秒数
+-- アビリティリキャスト定義
+-- call_id: GetAbilityCallByIndex が返す値（実機で /ba debug 確認）
+-- 未確認の場合は 0 にしておくとリキャスト表示をスキップ
 -- ============================================================
-local RECAST_DEFS = {
-    [BUFF_REPRISAL] = { name = 'Reprisal', recast = 30  },
-    [BUFF_SENTINEL] = { name = 'Sentinel', recast = 300 },
-    [BUFF_CRUSADE]  = { name = 'Crusade',  recast = 300 },
+local ABILITY_DEFS = {
+    { buff_id = BUFF_REPRISAL, name = 'Reprisal', call_id = 177 },
+    { buff_id = BUFF_SENTINEL, name = 'Sentinel', call_id = 71  },
+    { buff_id = BUFF_CRUSADE,  name = 'Crusade',  call_id = 231 },
 }
 
-local recast_timers = {
-    [BUFF_REPRISAL] = 0,
-    [BUFF_SENTINEL] = 0,
-    [BUFF_CRUSADE]  = 0,
-}
-
-local prev_buff_state = {
-    [BUFF_PHALANX]  = false,
-    [BUFF_SENTINEL] = false,
-    [BUFF_REPRISAL] = false,
-    [BUFF_CRUSADE]  = false,
-}
-
--- ============================================================
--- スペルリキャスト取得（メモリ読み取り）
--- Ashita v4: GetSpellTimerByIndex(spell_id) → 1/4秒単位のtick
--- ============================================================
-local function get_spell_recast_secs(spell_id)
-    local recast = AshitaCore:GetMemoryManager():GetRecast()
-    if recast == nil then return 0 end
-    local tick = recast:GetSpellTimerByIndex(spell_id)
-    if tick == nil then return 0 end
-    return math.ceil(tick / 4)
-end
-
--- スペルリキャスト表示リスト
--- spell_id は実機で確認が必要。コメントアウトで無効化できる
-local SPELL_RECASTS = {
-    -- Flash（PLD/RDM）: spell_id は実機確認要
+-- スペルリキャスト定義
+-- spell_id: GetSpellTimerByIndex に渡す値（実機で /ba debug 確認）
+-- 未確認の場合は nil にしておくとスキップ
+local SPELL_DEFS = {
     -- { name = 'Flash',   spell_id = 57  },
-    -- Phalanx（PLD II）: spell_id は実機確認要
     -- { name = 'Phalanx', spell_id = 36  },
 }
 
 -- ============================================================
--- 時間フォーマット（秒 → 表示文字列）
+-- メモリ読み取り（全て pcall でラップしてクラッシュ防止）
+-- GetAbilityTimerByIndex の単位は秒（実機確認要）
+-- GetSpellTimerByIndex の単位は 1/4 秒（実機確認要）
+-- ============================================================
+local function get_ability_recast_secs(call_id)
+    if call_id == 0 or call_id == nil then return 0 end
+    local ok, result = pcall(function()
+        local recast = AshitaCore:GetMemoryManager():GetRecast()
+        if recast == nil then return 0 end
+        for i = 0, 31 do
+            local c = recast:GetAbilityCallByIndex(i)
+            if c ~= nil and c == call_id then
+                local t = recast:GetAbilityTimerByIndex(i)
+                return (t ~= nil) and t or 0
+            end
+        end
+        return 0
+    end)
+    return (ok and type(result) == 'number') and result or 0
+end
+
+local function get_spell_recast_secs(spell_id)
+    if spell_id == nil then return 0 end
+    local ok, result = pcall(function()
+        local recast = AshitaCore:GetMemoryManager():GetRecast()
+        if recast == nil then return 0 end
+        local t = recast:GetSpellTimerByIndex(spell_id)
+        return (t ~= nil) and math.ceil(t / 4) or 0
+    end)
+    return (ok and type(result) == 'number') and result or 0
+end
+
+-- ============================================================
+-- 時間フォーマット（秒 → "Xs" / "X:XX"）
 -- ============================================================
 local function fmt_time(secs)
     secs = math.ceil(secs)
@@ -115,46 +123,18 @@ local function fmt_time(secs)
 end
 
 -- ============================================================
--- バフ監視・リキャストタイマー更新
+-- バフ監視（1秒ごとにチェック）
 -- ============================================================
 local function update_buff_watch(dt)
-    -- フレームごとにリキャストカウントダウン
-    for buff_id in pairs(recast_timers) do
-        if recast_timers[buff_id] > 0 then
-            recast_timers[buff_id] = math.max(0, recast_timers[buff_id] - dt)
-        end
-    end
-
-    -- 1秒ごとにバフ状態チェック
     buff_check_timer = buff_check_timer + dt
     if buff_check_timer < 1.0 then return end
     buff_check_timer = 0
 
-    local cur = {
-        [BUFF_PHALANX]  = has_buff(BUFF_PHALANX),
-        [BUFF_SENTINEL] = has_buff(BUFF_SENTINEL),
-        [BUFF_REPRISAL] = has_buff(BUFF_REPRISAL),
-        [BUFF_CRUSADE]  = has_buff(BUFF_CRUSADE),
-    }
-
-    if buff_watch_ready then
-        -- バフ消滅を検知 → リキャストタイマー開始
-        for buff_id, def in pairs(RECAST_DEFS) do
-            if prev_buff_state[buff_id] and not cur[buff_id] then
-                recast_timers[buff_id] = def.recast
-            end
-        end
-    end
-
-    for buff_id in pairs(prev_buff_state) do
-        prev_buff_state[buff_id] = cur[buff_id]
-    end
-
     local missing = {}
-    if not cur[BUFF_PHALANX]  then table.insert(missing, 'Phalanx')  end
-    if not cur[BUFF_SENTINEL]  then table.insert(missing, 'Sentinel')  end
-    if not cur[BUFF_REPRISAL]  then table.insert(missing, 'Reprisal')  end
-    if not cur[BUFF_CRUSADE]   then table.insert(missing, 'Crusade')   end
+    if not has_buff(BUFF_PHALANX)  then table.insert(missing, 'Phalanx')  end
+    if not has_buff(BUFF_SENTINEL)  then table.insert(missing, 'Sentinel')  end
+    if not has_buff(BUFF_REPRISAL)  then table.insert(missing, 'Reprisal')  end
+    if not has_buff(BUFF_CRUSADE)   then table.insert(missing, 'Crusade')   end
 
     if buff_watch_ready and #missing > prev_missing_count then
         ashita.misc.play_sound(addon.path .. '\\sounds\\buff_off.wav')
@@ -171,11 +151,10 @@ end
 
 -- ============================================================
 -- バフ行描画ヘルパー
--- ok: バフ有効か, name: 表示名, recast_secs: リキャスト残り秒
 -- ============================================================
 local function draw_buff_row(ok, name, recast_secs)
-    local label
     local time_str = fmt_time(recast_secs)
+    local label
     if ok then
         label = string.format('[*] %-10s', name)
     elseif time_str ~= '' then
@@ -220,16 +199,17 @@ ashita.events.register('d3d_present', 'battleassist_render', function()
 
         imgui.Separator()
 
-        -- アビリティ系バフ（リキャスト表示付き）
-        draw_buff_row(has_buff(BUFF_PHALANX),  'Phalanx',  0)
-        draw_buff_row(has_buff(BUFF_SENTINEL), 'Sentinel', recast_timers[BUFF_SENTINEL])
-        draw_buff_row(has_buff(BUFF_REPRISAL), 'Reprisal', recast_timers[BUFF_REPRISAL])
-        draw_buff_row(has_buff(BUFF_CRUSADE),  'Crusade',  recast_timers[BUFF_CRUSADE])
+        -- アビリティバフ（リキャストはメモリから直接取得）
+        draw_buff_row(has_buff(BUFF_PHALANX), 'Phalanx', 0)
+        for _, def in ipairs(ABILITY_DEFS) do
+            local recast = get_ability_recast_secs(def.call_id)
+            draw_buff_row(has_buff(def.buff_id), def.name, recast)
+        end
 
-        -- スペルリキャスト表示（spell_id 確認後にコメントアウト解除）
-        if #SPELL_RECASTS > 0 then
+        -- スペルリキャスト（SPELL_DEFS に定義がある場合のみ）
+        if #SPELL_DEFS > 0 then
             imgui.Separator()
-            for _, sp in ipairs(SPELL_RECASTS) do
+            for _, sp in ipairs(SPELL_DEFS) do
                 local secs = get_spell_recast_secs(sp.spell_id)
                 local label
                 if secs > 0 then
@@ -260,16 +240,73 @@ ashita.events.register('d3d_present', 'battleassist_render', function()
 end)
 
 -- ============================================================
--- zone_change - エリアチェンジ時はバフ監視・タイマーをリセット
+-- zone_change - エリアチェンジ時はバフ監視をリセット
 -- ============================================================
 ashita.events.register('zone_change', 'battleassist_zone_change', function()
     buff_watch_ready   = false
     prev_missing_count = 0
-    for buff_id in pairs(recast_timers) do
-        recast_timers[buff_id] = 0
-    end
-    for buff_id in pairs(prev_buff_state) do
-        prev_buff_state[buff_id] = false
+end)
+
+-- ============================================================
+-- コマンド処理
+-- /ba debug  - リキャストスロット一覧をチャットに表示（call_id 確認用）
+-- /ba hide   - HUD を非表示
+-- /ba show   - HUD を表示
+-- ============================================================
+ashita.events.register('command', 'battleassist_command', function(e)
+    local args = e.command:lower():args()
+    if args[1] ~= '/ba' then return end
+
+    if args[2] == 'debug' then
+        -- アビリティリキャストスロット一覧
+        print('[BattleAssist] === アビリティリキャスト スロット一覧 ===')
+        local ok = pcall(function()
+            local recast = AshitaCore:GetMemoryManager():GetRecast()
+            if recast == nil then
+                print('[BattleAssist] GetRecast() が nil です')
+                return
+            end
+            for i = 0, 31 do
+                local call  = recast:GetAbilityCallByIndex(i)
+                local timer = recast:GetAbilityTimerByIndex(i)
+                if call ~= nil and call > 0 then
+                    print(string.format('[BattleAssist]  slot=%d  call_id=%d  timer=%s',
+                        i, call, tostring(timer)))
+                end
+            end
+        end)
+        if not ok then
+            print('[BattleAssist] デバッグ中にエラーが発生しました')
+        end
+
+        -- スペルリキャストスロット一覧（リキャスト中のもののみ）
+        print('[BattleAssist] === スペルリキャスト（リキャスト中のみ）===')
+        local ok2 = pcall(function()
+            local recast = AshitaCore:GetMemoryManager():GetRecast()
+            if recast == nil then return end
+            for i = 0, 1023 do
+                local timer = recast:GetSpellTimerByIndex(i)
+                if timer ~= nil and timer > 0 then
+                    print(string.format('[BattleAssist]  spell_id=%d  timer=%d (約%ds)',
+                        i, timer, math.ceil(timer / 4)))
+                end
+            end
+        end)
+        if not ok2 then
+            print('[BattleAssist] スペルデバッグ中にエラーが発生しました')
+        end
+
+        e.blocked = true
+
+    elseif args[2] == 'hide' then
+        cfg.visible = false
+        settings.save()
+        e.blocked = true
+
+    elseif args[2] == 'show' then
+        cfg.visible = true
+        settings.save()
+        e.blocked = true
     end
 end)
 
@@ -279,6 +316,7 @@ end)
 ashita.events.register('load', 'battleassist_load', function()
     cfg = settings.load(default_settings)
     print('[BattleAssist] v4.0 loaded.')
+    print('[BattleAssist] /ba debug でリキャストスロット一覧を確認できます')
 end)
 
 ashita.events.register('unload', 'battleassist_unload', function()
