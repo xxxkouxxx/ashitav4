@@ -274,17 +274,19 @@ ashita.events.register('packet_in', 'eas_packet_in', function(e)
     -- 通常デバッグは state.searching 中のみ
     local in_capture = (capture_timer > 0)
     if DEBUG_PACKET and (in_capture or state.searching) then
-        local key     = string.format('0x%04X', e.id)
-        local always  = (e.id == SEARCH_RESULT_PACKET or e.id == SEARCH_END_PACKET)
+        local key    = string.format('0x%04X', e.id)
+        local always = (e.id == SEARCH_RESULT_PACKET or e.id == SEARCH_END_PACKET)
         if always or not debug_seen_ids[key] then
             if not always then debug_seen_ids[key] = true end
-            -- 0x000D / 0x000E は 64 バイト、それ以外は 32 バイト表示
+            -- データを安全に読み取る（#e.data が使えないパケットがあるため固定上限を使用）
             local max_bytes = always and 63 or 31
             local hex = ''
-            for i = 0, math.min(max_bytes, #e.data - 1) do
-                hex = hex .. string.format('%02X ', ashita.bits.unpack_be(e.data_raw, i * 8, 8) or 0)
+            for i = 0, max_bytes do
+                local b = ashita.bits.unpack_be(e.data_raw, i * 8, 8)
+                if not b then break end
+                hex = hex .. string.format('%02X ', b)
             end
-            local msg = string.format('[EAS] id=%s z=%d len=%d | %s', key, state.current_zone, #e.data, hex)
+            local msg = string.format('[EAS] id=%s z=%d | %s', key, state.current_zone, hex)
             print(msg)
             if DEBUG_LOG_PATH then
                 local f = io.open(DEBUG_LOG_PATH, 'a')
@@ -485,10 +487,12 @@ local capture_timer = 0   -- キャプチャ残り秒数（0=無効）
 ashita.events.register('packet_out', 'eas_packet_out', function(e)
     if capture_timer <= 0 then return end
     local hex = ''
-    for i = 0, math.min(31, #e.data - 1) do
-        hex = hex .. string.format('%02X ', ashita.bits.unpack_be(e.data_raw, i * 8, 8) or 0)
+    for i = 0, 31 do
+        local b = ashita.bits.unpack_be(e.data_raw, i * 8, 8)
+        if not b then break end
+        hex = hex .. string.format('%02X ', b)
     end
-    local msg = string.format('[EAS] id=0x%04X len=%d | %s', e.id, #e.data, hex)
+    local msg = string.format('[EAS] id=0x%04X | %s', e.id, hex)
     if DEBUG_LOG_PATH then
         local f = io.open(DEBUG_LOG_PATH, 'a')
         if f then f:write(os.date('%H:%M:%S') .. ' OUT ' .. msg .. '\n'); f:close() end
