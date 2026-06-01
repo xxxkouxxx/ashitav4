@@ -125,11 +125,11 @@ local default_settings = T{
     visible    = true,
     x          = 20,
     y          = 20,
-    zone1_name = '',   -- ゾーン1 名前
-    zone1_id   = 0,    -- ゾーン1 ID（0=フィルタなし）
-    zone2_name = '',   -- ゾーン2 名前
+    zone1_name = 'Alzadaal Undersea Ruins',
+    zone1_id   = 0,
+    zone2_name = 'The Boyahda Tree',
     zone2_id   = 0,
-    zone3_name = '',   -- ゾーン3 名前
+    zone3_name = "Ru'Aun Gardens",
     zone3_id   = 0,
     threshold  = 10,   -- 戦闘検知しきい値（全ゾーン共通）
     interval   = 300,  -- サーチサイクル間隔（秒）
