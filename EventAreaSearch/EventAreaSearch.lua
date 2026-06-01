@@ -209,6 +209,10 @@ local function any_combat()
     return zs[1].combat or zs[2].combat or zs[3].combat
 end
 
+-- キャプチャモード残り秒数（0=無効）
+-- packet_in ハンドラより前に宣言しないとクロージャが global nil を参照してしまう
+local capture_timer = 0
+
 -- ============================================================
 -- サーチサイクル制御
 -- ============================================================
@@ -272,28 +276,27 @@ ashita.events.register('packet_in', 'eas_packet_in', function(e)
 
     -- デバッグ: キャプチャモード中は state.searching に関係なく全パケット記録
     -- 通常デバッグは state.searching 中のみ
-    local in_capture = (capture_timer > 0)
-    if DEBUG_PACKET and (in_capture or state.searching) then
+    pcall(function()
+        local in_capture = (capture_timer > 0)
+        if not (DEBUG_PACKET and (in_capture or state.searching)) then return end
         local key    = string.format('0x%04X', e.id)
         local always = (e.id == SEARCH_RESULT_PACKET or e.id == SEARCH_END_PACKET)
-        if always or not debug_seen_ids[key] then
-            if not always then debug_seen_ids[key] = true end
-            -- データを安全に読み取る（#e.data が使えないパケットがあるため固定上限を使用）
-            local max_bytes = always and 63 or 31
-            local hex = ''
-            for i = 0, max_bytes do
-                local b = ashita.bits.unpack_be(e.data_raw, i * 8, 8)
-                if not b then break end
-                hex = hex .. string.format('%02X ', b)
-            end
-            local msg = string.format('[EAS] id=%s z=%d | %s', key, state.current_zone, hex)
-            print(msg)
-            if DEBUG_LOG_PATH then
-                local f = io.open(DEBUG_LOG_PATH, 'a')
-                if f then f:write(os.date('%H:%M:%S') .. ' IN  ' .. msg .. '\n'); f:close() end
-            end
+        if not always and debug_seen_ids[key] then return end
+        if not always then debug_seen_ids[key] = true end
+        local max_bytes = always and 63 or 31
+        local hex = ''
+        for i = 0, max_bytes do
+            local b = ashita.bits.unpack_be(e.data_raw, i * 8, 8)
+            if not b then break end
+            hex = hex .. string.format('%02X ', b)
         end
-    end
+        local msg = string.format('[EAS] id=%s z=%d | %s', key, state.current_zone, hex)
+        print(msg)
+        if DEBUG_LOG_PATH then
+            local f = io.open(DEBUG_LOG_PATH, 'a')
+            if f then f:write(os.date('%H:%M:%S') .. ' IN  ' .. msg .. '\n'); f:close() end
+        end
+    end)
 
     -- サーチ結果終端パケット → 現在ゾーン評価 → 次のゾーンへ
     if e.id == SEARCH_END_PACKET then
@@ -482,8 +485,6 @@ end
 -- /eas capture で 30 秒間、送受信パケットを全記録する
 -- → ゲームUIでゾーン絞り込み検索をしたときの送信パケットを特定するのに使う
 -- ============================================================
-local capture_timer = 0   -- キャプチャ残り秒数（0=無効）
-
 ashita.events.register('packet_out', 'eas_packet_out', function(e)
     if capture_timer <= 0 then return end
     local hex = ''
