@@ -114,9 +114,15 @@ end
 -- パケット ID（要実機確認）
 -- DEBUG_PACKET = true で /eas search を実行して ID を特定する
 -- ============================================================
-local SEARCH_RESULT_PACKET = 0x00B4  -- サーチ結果 1 エントリ（推定値）
-local SEARCH_END_PACKET    = 0x00B5  -- サーチ結果終端（推定値）
+local SEARCH_RESULT_PACKET = 0x00B4  -- サーチ結果 1 エントリ（要実機確認）
+local SEARCH_END_PACKET    = 0x00B5  -- サーチ結果終端（要実機確認）
 local DEBUG_PACKET         = true    -- パケット ID 未確定の間は true 推奨
+
+-- デバッグログファイルパス
+local DEBUG_LOG_PATH = nil   -- load 時に設定
+
+-- サーチ中に見たパケット ID（同じ ID を何度も出力しない）
+local debug_seen_ids = {}
 
 -- ============================================================
 -- 設定デフォルト値（3ゾーン対応）
@@ -230,6 +236,7 @@ end
 -- サイクル開始（ゾーン1 から）
 local function start_cycle()
     state.current_zone = 0
+    debug_seen_ids     = {}   -- サーチ開始時に ID 履歴をリセット
     do_search_next()
 end
 
@@ -258,13 +265,26 @@ end
 -- ============================================================
 ashita.events.register('packet_in', 'eas_packet_in', function(e)
 
-    -- デバッグ: サーチ中の全パケットをログ出力（パケット ID 特定用）
+    -- デバッグ: サーチ中の新規パケット ID のみ記録（チャット + ファイル出力）
+    -- 同じ ID は 1 サーチサイクルにつき 1 回だけ出力してチャットを汚さない
     if DEBUG_PACKET and state.searching then
-        local hex = ''
-        for i = 0, math.min(31, #e.data - 1) do
-            hex = hex .. string.format('%02X ', ashita.bits.unpack_be(e.data_raw, i * 8, 8) or 0)
+        local key = string.format('0x%04X', e.id)
+        if not debug_seen_ids[key] then
+            debug_seen_ids[key] = true
+            local hex = ''
+            for i = 0, math.min(31, #e.data - 1) do
+                hex = hex .. string.format('%02X ', ashita.bits.unpack_be(e.data_raw, i * 8, 8) or 0)
+            end
+            local msg = string.format('[EAS DEBUG] id=%s len=%3d | %s', key, #e.data, hex)
+            print(msg)
+            if DEBUG_LOG_PATH then
+                local f = io.open(DEBUG_LOG_PATH, 'a')
+                if f then
+                    f:write(os.date('%H:%M:%S') .. ' zone=' .. state.current_zone .. ' ' .. msg .. '\n')
+                    f:close()
+                end
+            end
         end
-        print(string.format('[EAS DEBUG] id=0x%04X len=%3d | %s', e.id, #e.data, hex))
     end
 
     -- サーチ結果終端パケット → 現在ゾーン評価 → 次のゾーンへ
@@ -586,9 +606,11 @@ end)
 -- ============================================================
 ashita.events.register('load', 'eas_load', function()
     cfg = settings.load(default_settings)
+    DEBUG_LOG_PATH = AshitaCore:GetInstallPath() .. 'logs\\EventAreaSearch_debug.log'
     print('[EventAreaSearch] v' .. addon.version .. ' loaded. /eas help for commands.')
     if DEBUG_PACKET then
-        print('[EAS] DEBUG mode ON - use /eas search to identify packet IDs.')
+        print('[EAS] DEBUG mode ON.')
+        print('[EAS] Click "Search Now" then check: logs\\EventAreaSearch_debug.log')
     end
 end)
 
