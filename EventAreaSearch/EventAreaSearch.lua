@@ -270,8 +270,10 @@ end
 -- ============================================================
 ashita.events.register('packet_in', 'eas_packet_in', function(e)
 
-    -- デバッグ: 0x000D は毎回全バイト記録（seen_ids 無視）、それ以外は初回のみ
-    if DEBUG_PACKET and state.searching then
+    -- デバッグ: キャプチャモード中は state.searching に関係なく全パケット記録
+    -- 通常デバッグは state.searching 中のみ
+    local in_capture = (capture_timer > 0)
+    if DEBUG_PACKET and (in_capture or state.searching) then
         local key     = string.format('0x%04X', e.id)
         local always  = (e.id == SEARCH_RESULT_PACKET or e.id == SEARCH_END_PACKET)
         if always or not debug_seen_ids[key] then
