@@ -114,8 +114,11 @@ end
 -- パケット ID（要実機確認）
 -- DEBUG_PACKET = true で /eas search を実行して ID を特定する
 -- ============================================================
-local SEARCH_RESULT_PACKET = 0x00B4  -- サーチ結果 1 エントリ（要実機確認）
-local SEARCH_END_PACKET    = 0x00B5  -- サーチ結果終端（要実機確認）
+-- 実機確認済み（2026-06-01）
+-- 0x000D: サーチ結果パケット（オフセット 0x02 の 1バイト = 検出人数）
+-- 0x000E: サーチ終端パケット（これが来たら集計）
+local SEARCH_RESULT_PACKET = 0x000D
+local SEARCH_END_PACKET    = 0x000E
 local DEBUG_PACKET         = true    -- パケット ID 未確定の間は true 推奨
 
 -- デバッグログファイルパス
@@ -215,15 +218,17 @@ end
 local function do_search_next()
     for i = state.current_zone + 1, 3 do
         if zone_name(i) ~= '' then
-            state.current_zone  = i
-            state.searching     = true
-            state.search_timeout = 8.0
+            state.current_zone   = i
+            state.searching      = true
+            state.search_timeout = 10.0
             zs[i].count   = 0
             zs[i].results = {}
             zs[i].last_time = os.date('%H:%M:%S')
 
-            local cmd = string.format('/sea all "%s"', zone_name(i))
-            AshitaCore:GetChatManager():QueueCommand(-1, cmd)
+            -- /sea all はプレイヤー名・コメントのテキスト検索
+            -- ゾーン絞り込みは /sea <ゾーン名> または /sea <ゾーンID> の可能性あり（要確認）
+            -- まず /sea all で全員取得し、パケット内のゾーンIDでフィルタする方式を採用
+            AshitaCore:GetChatManager():QueueCommand(-1, '/sea all')
             return
         end
     end
@@ -265,24 +270,23 @@ end
 -- ============================================================
 ashita.events.register('packet_in', 'eas_packet_in', function(e)
 
-    -- デバッグ: サーチ中の新規パケット ID のみ記録（チャット + ファイル出力）
-    -- 同じ ID は 1 サーチサイクルにつき 1 回だけ出力してチャットを汚さない
+    -- デバッグ: 0x000D は毎回全バイト記録（seen_ids 無視）、それ以外は初回のみ
     if DEBUG_PACKET and state.searching then
-        local key = string.format('0x%04X', e.id)
-        if not debug_seen_ids[key] then
-            debug_seen_ids[key] = true
+        local key     = string.format('0x%04X', e.id)
+        local always  = (e.id == SEARCH_RESULT_PACKET or e.id == SEARCH_END_PACKET)
+        if always or not debug_seen_ids[key] then
+            if not always then debug_seen_ids[key] = true end
+            -- 0x000D / 0x000E は 64 バイト、それ以外は 32 バイト表示
+            local max_bytes = always and 63 or 31
             local hex = ''
-            for i = 0, math.min(31, #e.data - 1) do
+            for i = 0, math.min(max_bytes, #e.data - 1) do
                 hex = hex .. string.format('%02X ', ashita.bits.unpack_be(e.data_raw, i * 8, 8) or 0)
             end
-            local msg = string.format('[EAS DEBUG] id=%s len=%3d | %s', key, #e.data, hex)
+            local msg = string.format('[EAS] id=%s z=%d len=%d | %s', key, state.current_zone, #e.data, hex)
             print(msg)
             if DEBUG_LOG_PATH then
                 local f = io.open(DEBUG_LOG_PATH, 'a')
-                if f then
-                    f:write(os.date('%H:%M:%S') .. ' zone=' .. state.current_zone .. ' ' .. msg .. '\n')
-                    f:close()
-                end
+                if f then f:write(os.date('%H:%M:%S') .. ' IN  ' .. msg .. '\n'); f:close() end
             end
         end
     end
@@ -470,6 +474,26 @@ local function render_window()
 end
 
 -- ============================================================
+-- アウトゴーイングパケット監視（キャプチャモード中のみ）
+-- /eas capture で 30 秒間、送受信パケットを全記録する
+-- → ゲームUIでゾーン絞り込み検索をしたときの送信パケットを特定するのに使う
+-- ============================================================
+local capture_timer = 0   -- キャプチャ残り秒数（0=無効）
+
+ashita.events.register('packet_out', 'eas_packet_out', function(e)
+    if capture_timer <= 0 then return end
+    local hex = ''
+    for i = 0, math.min(31, #e.data - 1) do
+        hex = hex .. string.format('%02X ', ashita.bits.unpack_be(e.data_raw, i * 8, 8) or 0)
+    end
+    local msg = string.format('[EAS] id=0x%04X len=%d | %s', e.id, #e.data, hex)
+    if DEBUG_LOG_PATH then
+        local f = io.open(DEBUG_LOG_PATH, 'a')
+        if f then f:write(os.date('%H:%M:%S') .. ' OUT ' .. msg .. '\n'); f:close() end
+    end
+end)
+
+-- ============================================================
 -- d3d_present: タイマー更新 + 描画
 -- ============================================================
 ashita.events.register('d3d_present', 'eas_render', function()
@@ -489,6 +513,15 @@ ashita.events.register('d3d_present', 'eas_render', function()
         state.search_timeout = state.search_timeout - dt
         if state.search_timeout <= 0 then
             evaluate_and_continue()
+        end
+    end
+
+    -- キャプチャモードタイマー
+    if capture_timer > 0 then
+        capture_timer = capture_timer - dt
+        if capture_timer <= 0 then
+            capture_timer = 0
+            print('[EAS] Capture mode ended. Check: logs\\EventAreaSearch_debug.log')
         end
     end
 
@@ -579,6 +612,13 @@ ashita.events.register('command', 'eas_command', function(e)
     elseif sub == 'debug' then
         DEBUG_PACKET = not DEBUG_PACKET
         print('[EAS] Debug: ' .. (DEBUG_PACKET and 'ON' or 'OFF'))
+
+    elseif sub == 'capture' then
+        -- ゾーン検索パケット特定用: 30秒間 送受信パケットを全記録
+        capture_timer = 30
+        DEBUG_PACKET  = true
+        print('[EAS] Capture mode ON (30s). Now open search UI, set zone filter, click Search.')
+        print('[EAS] Log: logs\\EventAreaSearch_debug.log')
 
     elseif sub == 'clear' then
         for i = 1, 3 do
