@@ -1,36 +1,36 @@
 -- ============================================================
 -- EventAreaSearch.lua
--- Ashita v4 アドオン - イベントエリア戦闘検知
+-- Ashita v4 アドオン - イベントエリア戦闘検知（3ゾーン対応）
 --
 -- 概要:
---   指定ゾーンを /sea で定期サーチし、プレイヤーが一定数（デフォルト10名）
+--   最大3ゾーンを順番に /sea でサーチし、プレイヤーが一定数（デフォルト10名）
 --   以上検出された場合に「戦闘中」と判定してアラートを表示する。
---   別ゾーンからのリモート監視専用。
+--   ゾーン1→2→3 の順にサーチし、全完了後にインターバル待機。
 --
 -- コマンド:
---   /eas              - ウィンドウ 表示/非表示 切替
---   /eas on           - 監視開始（即時初回サーチ）
---   /eas off          - 監視停止
---   /eas search       - 手動即時サーチ
---   /eas zone <name>  - 対象ゾーン名設定（/sea コマンドに渡すゾーン名）
---   /eas zoneid <n>   - ゾーン ID 設定（パケットフィルタ用、0=フィルタなし）
---   /eas threshold <n>- 戦闘検知しきい値設定（デフォルト 10）
---   /eas interval <n> - サーチ間隔設定（秒、デフォルト 300）
---   /eas debug        - パケットデバッグログ 有効/無効 切替
---   /eas clear        - 結果クリア
---   /eas help         - ヘルプ表示
+--   /eas                   - ウィンドウ 表示/非表示 切替
+--   /eas on                - 監視開始（即時初回サーチ）
+--   /eas off               - 監視停止
+--   /eas search            - 手動即時サーチ（全ゾーン）
+--   /eas zone <n> <name>   - ゾーン n（1-3）の名前設定
+--   /eas zoneid <n> <id>   - ゾーン n の ID 設定（パケットフィルタ用）
+--   /eas threshold <n>     - 戦闘検知しきい値設定（デフォルト 10）
+--   /eas interval <n>      - サーチ間隔設定（秒、デフォルト 300）
+--   /eas debug             - パケットデバッグログ 有効/無効 切替
+--   /eas clear             - 全結果クリア
+--   /eas help              - ヘルプ表示
 --
 -- パケット ID の確認方法:
 --   1. /eas debug → DEBUG モード ON
 --   2. /eas search → サーチ実行
 --   3. チャットログに [EAS DEBUG] id=0xXXXX ... が出る
---   4. /sea 実行直後に現れるパケット ID を SEARCH_RESULT_PACKET に設定
+--   4. /sea 実行直後に現れる ID を SEARCH_RESULT_PACKET に設定
 -- ============================================================
 
 addon.name    = 'EventAreaSearch'
 addon.author  = '7xxxk'
-addon.version = '1.0'
-addon.desc    = 'Event area combat detection by /sea player count'
+addon.version = '1.1'
+addon.desc    = '3-zone event combat detection by /sea player count'
 
 require('common')
 local settings = require('settings')
@@ -38,7 +38,6 @@ local imgui    = require('imgui')
 
 -- ============================================================
 -- Shift-JIS → UTF-8 変換（PTChatLog.lua より流用）
--- サーチコメントが SJIS の場合に使用
 -- ============================================================
 local ffi = nil
 local k32 = nil
@@ -78,9 +77,7 @@ local function sjis_to_utf8(str)
     return ok and result or str
 end
 
--- ============================================================
--- NUL 終端文字列をパケットデータから読み取る（PTChatLog.lua より流用）
--- ============================================================
+-- NUL 終端文字列をパケットデータから読み取る
 local function read_string(data, byte_offset)
     local result = {}
     local i      = byte_offset
@@ -94,7 +91,7 @@ local function read_string(data, byte_offset)
     return table.concat(result)
 end
 
--- FFXI エスケープコード（色・書式）を除去してから SJIS 変換する
+-- FFXI エスケープコード除去 + SJIS 変換
 local function clean_str(raw)
     if not raw or raw == '' then return '' end
     local result = {}
@@ -102,9 +99,9 @@ local function clean_str(raw)
     while i <= len do
         local b = raw:byte(i)
         if (b == 0x1E or b == 0x1F) and i < len then
-            i = i + 2   -- エスケープコード + 引数1バイトをスキップ
+            i = i + 2
         elseif b < 0x20 then
-            i = i + 1   -- その他の制御文字をスキップ
+            i = i + 1
         else
             result[#result + 1] = raw:sub(i, i)
             i = i + 1
@@ -114,37 +111,29 @@ local function clean_str(raw)
 end
 
 -- ============================================================
--- パケット ID
---
--- !! 要実機確認 !!
--- 下記の ID はコミュニティ調査に基づく推定値。
--- DEBUG_PACKET = true で /eas search を実行し、
--- [EAS DEBUG] ログを見てサーチ結果パケットの ID を特定してください。
+-- パケット ID（要実機確認）
+-- DEBUG_PACKET = true で /eas search を実行して ID を特定する
 -- ============================================================
-
--- サーチ結果エントリ（プレイヤー1件分）
--- 候補: 0x00B4 付近（要確認）
-local SEARCH_RESULT_PACKET = 0x00B4
-
--- サーチ結果リスト終端（これが来たら集計する）
--- 候補: SEARCH_RESULT_PACKET の直後（要確認）
-local SEARCH_END_PACKET    = 0x00B5
-
--- パケットデバッグモード（ID 未確定の間は true 推奨）
-local DEBUG_PACKET = true
+local SEARCH_RESULT_PACKET = 0x00B4  -- サーチ結果 1 エントリ（推定値）
+local SEARCH_END_PACKET    = 0x00B5  -- サーチ結果終端（推定値）
+local DEBUG_PACKET         = true    -- パケット ID 未確定の間は true 推奨
 
 -- ============================================================
--- 設定デフォルト値
+-- 設定デフォルト値（3ゾーン対応）
 -- ============================================================
 local default_settings = T{
-    visible   = true,
-    x         = 20,
-    y         = 20,
-    zone_name = '',   -- /sea に渡すゾーン名（例: "Ru'Aun Gardens"）
-    zone_id   = 0,    -- ゾーン ID（パケットフィルタ用、0=フィルタなし）
-    threshold = 10,   -- 戦闘検知しきい値（人数）
-    interval  = 300,  -- サーチ間隔（秒）
-    sound     = false,-- アラートサウンド再生
+    visible    = true,
+    x          = 20,
+    y          = 20,
+    zone1_name = '',   -- ゾーン1 名前
+    zone1_id   = 0,    -- ゾーン1 ID（0=フィルタなし）
+    zone2_name = '',   -- ゾーン2 名前
+    zone2_id   = 0,
+    zone3_name = '',   -- ゾーン3 名前
+    zone3_id   = 0,
+    threshold  = 10,   -- 戦闘検知しきい値（全ゾーン共通）
+    interval   = 300,  -- サーチサイクル間隔（秒）
+    sound      = false,
 }
 local cfg = T{}
 
@@ -153,56 +142,115 @@ settings.register('settings', 'eas_settings_update', function(new_cfg)
 end)
 
 -- ============================================================
--- 状態変数
+-- ゾーン情報アクセスヘルパー
 -- ============================================================
-local state = {
-    active          = false,  -- 監視有効フラグ
-    timer           = 0,      -- サーチ間隔タイマー（秒）
-    searching       = false,  -- サーチ応答待ちフラグ
-    search_timeout  = 0,      -- タイムアウトカウントダウン（秒）
-    result_count    = 0,      -- 今回の検出人数
-    combat          = false,  -- 戦闘検知フラグ
-    combat_blink    = 0,      -- 点滅アニメーションタイマー
-    results         = {},     -- name -> { comment, time } テーブル
-    last_search_str = '---',  -- 最終サーチ時刻（表示用）
-}
-
--- ============================================================
--- サーチ実行
--- ============================================================
-local function do_search()
-    local cmd
-    if cfg.zone_name ~= '' then
-        cmd = string.format('/sea all "%s"', cfg.zone_name)
-    else
-        cmd = '/sea all'
+local function zone_name(i)
+    if i == 1 then return cfg.zone1_name
+    elseif i == 2 then return cfg.zone2_name
+    elseif i == 3 then return cfg.zone3_name
     end
-    AshitaCore:GetChatManager():QueueCommand(-1, cmd)
-    state.searching      = true
-    state.search_timeout = 8.0   -- 8 秒以内に終端パケットが来なければタイムアウト
-    state.result_count   = 0
-    state.results        = {}    -- 今回分をリセット
-    state.last_search_str = os.date('%H:%M:%S')
+    return ''
+end
+
+local function zone_id(i)
+    if i == 1 then return cfg.zone1_id
+    elseif i == 2 then return cfg.zone2_id
+    elseif i == 3 then return cfg.zone3_id
+    end
+    return 0
+end
+
+local function set_zone_name(i, name)
+    if i == 1 then cfg.zone1_name = name
+    elseif i == 2 then cfg.zone2_name = name
+    elseif i == 3 then cfg.zone3_name = name
+    end
+end
+
+local function set_zone_id(i, id)
+    if i == 1 then cfg.zone1_id = id
+    elseif i == 2 then cfg.zone2_id = id
+    elseif i == 3 then cfg.zone3_id = id
+    end
 end
 
 -- ============================================================
--- 戦闘状態評価（サーチ完了またはタイムアウト時に呼ぶ）
+-- 状態変数
 -- ============================================================
-local function evaluate_combat()
-    local was_combat = state.combat
-    state.combat    = (state.result_count >= cfg.threshold)
-    state.searching = false
 
-    -- 新規検知時のみアラート出力
-    if state.combat and not was_combat then
-        print(string.format('[EventAreaSearch] !! COMBAT DETECTED !! %d players in "%s"',
-            state.result_count, cfg.zone_name ~= '' and cfg.zone_name or 'all'))
-        if cfg.sound then
-            pcall(function()
-                ashita.misc.play_sound(addon.path .. 'sounds\\alert.wav')
-            end)
+-- サイクル全体の状態
+local state = {
+    active        = false,  -- 監視有効フラグ
+    timer         = 0,      -- サイクル間隔タイマー（秒）
+    current_zone  = 0,      -- 現在サーチ中のゾーン番号（0=非サーチ中）
+    searching     = false,  -- サーチ応答待ちフラグ
+    search_timeout= 0,      -- タイムアウトカウントダウン（秒）
+    combat_blink  = 0,      -- 点滅アニメーションタイマー
+}
+
+-- ゾーンごとの状態（インデックス 1-3）
+local zs = {
+    { count = 0, combat = false, results = {}, last_time = '---' },
+    { count = 0, combat = false, results = {}, last_time = '---' },
+    { count = 0, combat = false, results = {}, last_time = '---' },
+}
+
+-- いずれかのゾーンで戦闘中か
+local function any_combat()
+    return zs[1].combat or zs[2].combat or zs[3].combat
+end
+
+-- ============================================================
+-- サーチサイクル制御
+-- ============================================================
+
+-- 次にサーチすべきゾーンを探して実行する
+-- current_zone の次から順に、名前が設定されているゾーンを探す
+local function do_search_next()
+    for i = state.current_zone + 1, 3 do
+        if zone_name(i) ~= '' then
+            state.current_zone  = i
+            state.searching     = true
+            state.search_timeout = 8.0
+            zs[i].count   = 0
+            zs[i].results = {}
+            zs[i].last_time = os.date('%H:%M:%S')
+
+            local cmd = string.format('/sea all "%s"', zone_name(i))
+            AshitaCore:GetChatManager():QueueCommand(-1, cmd)
+            return
         end
     end
+
+    -- 全ゾーン完了
+    state.current_zone = 0
+    state.searching    = false
+end
+
+-- サイクル開始（ゾーン1 から）
+local function start_cycle()
+    state.current_zone = 0
+    do_search_next()
+end
+
+-- 現在ゾーンの評価 → 次のゾーンへ
+local function evaluate_and_continue()
+    local i = state.current_zone
+    if i >= 1 and i <= 3 then
+        local was_combat = zs[i].combat
+        zs[i].combat     = (zs[i].count >= cfg.threshold)
+
+        if zs[i].combat and not was_combat then
+            print(string.format('[EAS] !! COMBAT !! %d players in "%s"',
+                zs[i].count, zone_name(i)))
+            if cfg.sound then
+                pcall(function()
+                    ashita.misc.play_sound(addon.path .. 'sounds\\alert.wav')
+                end)
+            end
+        end
+    end
+    do_search_next()
 end
 
 -- ============================================================
@@ -211,7 +259,7 @@ end
 ashita.events.register('packet_in', 'eas_packet_in', function(e)
 
     -- デバッグ: サーチ中の全パケットをログ出力（パケット ID 特定用）
-    if DEBUG_PACKET and state.active then
+    if DEBUG_PACKET and state.searching then
         local hex = ''
         for i = 0, math.min(31, #e.data - 1) do
             hex = hex .. string.format('%02X ', ashita.bits.unpack_be(e.data_raw, i * 8, 8) or 0)
@@ -219,37 +267,34 @@ ashita.events.register('packet_in', 'eas_packet_in', function(e)
         print(string.format('[EAS DEBUG] id=0x%04X len=%3d | %s', e.id, #e.data, hex))
     end
 
-    -- サーチ結果終端パケット → 集計
+    -- サーチ結果終端パケット → 現在ゾーン評価 → 次のゾーンへ
     if e.id == SEARCH_END_PACKET then
         if state.searching then
-            evaluate_combat()
+            evaluate_and_continue()
         end
         return
     end
 
-    -- サーチ結果 1 エントリパケット
     if e.id ~= SEARCH_RESULT_PACKET then return end
     if not state.searching then return end
 
+    local i = state.current_zone
+    if i < 1 or i > 3 then return end
+
     local ok, err = pcall(function()
         -- !!!! パケット構造は要実機確認 !!!!
-        --
-        -- デバッグ出力を見てオフセットを特定したら下記を修正:
-        --   zone_id = ashita.bits.unpack_be(e.data_raw, ZONE_OFFSET * 8, 16)
-        --   name    = clean_str(read_string(e.data_raw, NAME_OFFSET))
-        --   comment = clean_str(read_string(e.data_raw, COMMENT_OFFSET))
-        --
-        -- ゾーン ID フィルタ（zone_id == 0 はフィルタなし）:
-        --   if cfg.zone_id ~= 0 and zone_id ~= cfg.zone_id then return end
+        -- デバッグ出力でオフセットを確認後、以下を修正:
+        --   local zid  = ashita.bits.unpack_be(e.data_raw, ZONE_OFFSET * 8, 16)
+        --   local name = clean_str(read_string(e.data_raw, NAME_OFFSET))
+        --   local comm = clean_str(read_string(e.data_raw, COMMENT_OFFSET))
+        --   if zone_id(i) ~= 0 and zid ~= zone_id(i) then return end
 
-        -- 暫定: パケット 1 つ = プレイヤー 1 名として計上
-        state.result_count = state.result_count + 1
+        -- 暫定: パケット 1 つ = プレイヤー 1 名
+        zs[i].count = zs[i].count + 1
 
-        -- パケット構造確定後に以下を有効化:
-        -- local name    = clean_str(read_string(e.data_raw, NAME_OFFSET))
-        -- local comment = clean_str(read_string(e.data_raw, COMMENT_OFFSET))
+        -- 構造確定後に有効化:
         -- if name ~= '' then
-        --     state.results[name] = { comment = comment, time = os.time() }
+        --     zs[i].results[name] = { comment = comm, time = os.time() }
         -- end
     end)
     if not ok then
@@ -260,13 +305,56 @@ end)
 -- ============================================================
 -- ImGui ウィンドウ描画
 -- ============================================================
+local function draw_zone_row(i)
+    local name = zone_name(i)
+    if name == '' then
+        imgui.PushStyleColor(ImGuiCol_Text, { 0.4, 0.4, 0.4, 1.0 })
+        imgui.Text(string.format('Zone %d: (not set - /eas zone %d <name>)', i, i))
+        imgui.PopStyleColor()
+        return
+    end
+
+    local z = zs[i]
+
+    -- ゾーン名（現在サーチ中は黄色）
+    if state.searching and state.current_zone == i then
+        imgui.PushStyleColor(ImGuiCol_Text, { 1.0, 0.85, 0.2, 1.0 })
+        imgui.Text(string.format('Zone %d: %s  [Searching...]', i, name))
+        imgui.PopStyleColor()
+    else
+        imgui.PushStyleColor(ImGuiCol_Text, { 0.75, 0.75, 0.75, 1.0 })
+        imgui.Text(string.format('Zone %d: %s', i, name))
+        imgui.PopStyleColor()
+    end
+
+    -- プレイヤー数 + ステータス
+    if z.combat then
+        local a = 0.6 + 0.4 * math.abs(math.sin(state.combat_blink * 2.5))
+        imgui.PushStyleColor(ImGuiCol_Text, { 1.0, 0.15, 0.15, a })
+        imgui.Text(string.format('  Players: %d / %d  !! COMBAT !!', z.count, cfg.threshold))
+        imgui.PopStyleColor()
+    else
+        local col = z.count >= cfg.threshold
+            and { 1.0, 0.3, 0.3, 1.0 }
+            or  { 0.85, 0.85, 0.85, 1.0 }
+        imgui.PushStyleColor(ImGuiCol_Text, col)
+        imgui.Text(string.format('  Players: %d / %d', z.count, cfg.threshold))
+        imgui.PopStyleColor()
+    end
+
+    -- 最終サーチ時刻
+    imgui.PushStyleColor(ImGuiCol_Text, { 0.55, 0.55, 0.55, 1.0 })
+    imgui.Text('  Last: ' .. z.last_time)
+    imgui.PopStyleColor()
+end
+
 local function render_window()
     if not cfg.visible then return end
 
-    -- 戦闘検知中はウィンドウ背景を赤にする
+    -- いずれかのゾーンで戦闘中なら背景を赤に
     local pushed_color = false
-    if state.combat then
-        local a = 0.5 + 0.3 * math.abs(math.sin(state.combat_blink * 2.5))
+    if any_combat() then
+        local a = 0.45 + 0.25 * math.abs(math.sin(state.combat_blink * 2.5))
         imgui.PushStyleColor(ImGuiCol_WindowBg, { 0.55, 0.04, 0.04, a })
         pushed_color = true
     end
@@ -286,47 +374,39 @@ local function render_window()
         imgui.PushStyleColor(ImGuiCol_Text, { 0.6, 0.85, 1.0, 1.0 })
         imgui.Text('EventAreaSearch v' .. addon.version)
         imgui.PopStyleColor()
+
         imgui.Separator()
 
-        -- ゾーン
-        local zone_label = cfg.zone_name ~= '' and cfg.zone_name or '(not set - use /eas zone <name>)'
-        imgui.Text('Zone: ' .. zone_label)
+        -- ゾーン1
+        draw_zone_row(1)
 
-        -- 検出人数（しきい値以上で赤）
-        local cnt_col = state.result_count >= cfg.threshold
-            and { 1.0, 0.3, 0.3, 1.0 }
-            or  { 0.9, 0.9, 0.9, 1.0 }
-        imgui.PushStyleColor(ImGuiCol_Text, cnt_col)
-        imgui.Text(string.format('Players: %d  /  Threshold: %d', state.result_count, cfg.threshold))
-        imgui.PopStyleColor()
+        imgui.Separator()
 
-        -- ステータス行
-        if state.combat then
-            local a = 0.6 + 0.4 * math.abs(math.sin(state.combat_blink * 2.5))
-            imgui.PushStyleColor(ImGuiCol_Text, { 1.0, 0.15, 0.15, a })
-            imgui.Text('!! COMBAT DETECTED !!')
+        -- ゾーン2
+        draw_zone_row(2)
+
+        imgui.Separator()
+
+        -- ゾーン3
+        draw_zone_row(3)
+
+        imgui.Separator()
+
+        -- 全体ステータス + 次回サーチまでの時間
+        if not state.active then
+            imgui.PushStyleColor(ImGuiCol_Text, { 0.45, 0.45, 0.45, 1.0 })
+            imgui.Text('Stopped')
             imgui.PopStyleColor()
         elseif state.searching then
             imgui.PushStyleColor(ImGuiCol_Text, { 1.0, 0.8, 0.2, 1.0 })
             imgui.Text('Searching...')
             imgui.PopStyleColor()
-        elseif state.active then
+        else
             imgui.PushStyleColor(ImGuiCol_Text, { 0.5, 0.9, 0.5, 1.0 })
             local remain = math.ceil(math.max(0, cfg.interval - state.timer))
-            imgui.Text(string.format('Watching... (next: %ds)', remain))
-            imgui.PopStyleColor()
-        else
-            imgui.PushStyleColor(ImGuiCol_Text, { 0.45, 0.45, 0.45, 1.0 })
-            imgui.Text('Stopped')
+            imgui.Text(string.format('Watching... (next cycle: %ds)', remain))
             imgui.PopStyleColor()
         end
-
-        imgui.Separator()
-
-        -- 最終サーチ時刻
-        imgui.PushStyleColor(ImGuiCol_Text, { 0.65, 0.65, 0.65, 1.0 })
-        imgui.Text('Last search: ' .. state.last_search_str)
-        imgui.PopStyleColor()
 
         imgui.Separator()
 
@@ -335,44 +415,29 @@ local function render_window()
             if imgui.Button(' Start ##eas') then
                 state.active = true
                 state.timer  = cfg.interval   -- 即座に初回サーチ
-                print('[EAS] Started monitoring: ' ..
-                    (cfg.zone_name ~= '' and cfg.zone_name or 'all zones'))
+                print('[EAS] Started.')
             end
         else
             if imgui.Button(' Stop ##eas') then
-                state.active    = false
-                state.searching = false
+                state.active       = false
+                state.searching    = false
+                state.current_zone = 0
                 print('[EAS] Stopped.')
             end
         end
 
         imgui.SameLine()
         if imgui.Button(' Search Now ##eas') then
-            do_search()
+            state.timer = 0
+            start_cycle()
         end
 
         imgui.SameLine()
         if imgui.Button(' Clear ##eas') then
-            state.results      = {}
-            state.result_count = 0
-            state.combat       = false
-        end
-
-        -- プレイヤーリスト（コメント収集後に表示）
-        local has_results = false
-        for _ in pairs(state.results) do has_results = true; break end
-        if has_results then
-            imgui.Separator()
-            imgui.Text('Players found:')
-            if imgui.BeginChild('eas_list##eas', { 0, 120 }, true) then
-                for name, info in pairs(state.results) do
-                    local line = name
-                    if info.comment and info.comment ~= '' then
-                        line = line .. '  ' .. info.comment
-                    end
-                    imgui.Text(line)
-                end
-                imgui.EndChild()
+            for i = 1, 3 do
+                zs[i].count   = 0
+                zs[i].combat  = false
+                zs[i].results = {}
             end
         end
 
@@ -390,25 +455,25 @@ end
 ashita.events.register('d3d_present', 'eas_render', function()
     local dt = imgui.GetIO().DeltaTime
 
-    -- サーチ間隔タイマー（サーチ待ち中は進めない）
-    if state.active and not state.searching then
+    -- サイクル間隔タイマー（サーチ中は進めない）
+    if state.active and not state.searching and state.current_zone == 0 then
         state.timer = state.timer + dt
         if state.timer >= cfg.interval then
             state.timer = 0
-            do_search()
+            start_cycle()
         end
     end
 
-    -- サーチタイムアウト処理
+    -- サーチタイムアウト
     if state.searching then
         state.search_timeout = state.search_timeout - dt
         if state.search_timeout <= 0 then
-            evaluate_combat()
+            evaluate_and_continue()
         end
     end
 
     -- 点滅アニメーション用タイマー
-    if state.combat then
+    if any_combat() then
         state.combat_blink = state.combat_blink + dt
     else
         state.combat_blink = 0
@@ -435,33 +500,46 @@ ashita.events.register('command', 'eas_command', function(e)
     elseif sub == 'on' or sub == 'start' then
         state.active = true
         state.timer  = cfg.interval   -- 即座に初回サーチ
-        print('[EAS] Started. Zone: ' .. (cfg.zone_name ~= '' and cfg.zone_name or 'all'))
+        print('[EAS] Started.')
 
     elseif sub == 'off' or sub == 'stop' then
-        state.active    = false
-        state.searching = false
+        state.active       = false
+        state.searching    = false
+        state.current_zone = 0
         print('[EAS] Stopped.')
 
     elseif sub == 'search' then
-        do_search()
+        state.timer = 0
+        start_cycle()
 
     elseif sub == 'zone' then
-        if args[3] then
-            -- 残り引数をスペースで結合（ゾーン名にスペースが含まれる場合）
+        -- /eas zone <1-3> <name...>
+        local idx = tonumber(args[3])
+        if idx and idx >= 1 and idx <= 3 and args[4] then
             local parts = {}
-            for i = 3, #args do parts[#parts + 1] = args[i] end
-            cfg.zone_name = table.concat(parts, ' ')
+            for i = 4, #args do parts[#parts + 1] = args[i] end
+            local name = table.concat(parts, ' ')
+            set_zone_name(idx, name)
             settings.save()
-            print('[EAS] Zone: ' .. cfg.zone_name)
+            print(string.format('[EAS] Zone %d: %s', idx, name))
         else
-            print('[EAS] Zone: ' .. (cfg.zone_name ~= '' and cfg.zone_name or '(not set)'))
+            print('[EAS] Usage: /eas zone <1-3> <zone name>')
+            for i = 1, 3 do
+                local n = zone_name(i)
+                print(string.format('  Zone %d: %s', i, n ~= '' and n or '(not set)'))
+            end
         end
 
     elseif sub == 'zoneid' then
-        if args[3] then
-            cfg.zone_id = tonumber(args[3]) or 0
+        -- /eas zoneid <1-3> <id>
+        local idx = tonumber(args[3])
+        local id  = tonumber(args[4])
+        if idx and idx >= 1 and idx <= 3 and id then
+            set_zone_id(idx, id)
             settings.save()
-            print('[EAS] Zone ID: ' .. cfg.zone_id)
+            print(string.format('[EAS] Zone %d ID: %d', idx, id))
+        else
+            print('[EAS] Usage: /eas zoneid <1-3> <zone_id>')
         end
 
     elseif sub == 'threshold' then
@@ -483,21 +561,23 @@ ashita.events.register('command', 'eas_command', function(e)
         print('[EAS] Debug: ' .. (DEBUG_PACKET and 'ON' or 'OFF'))
 
     elseif sub == 'clear' then
-        state.results      = {}
-        state.result_count = 0
-        state.combat       = false
+        for i = 1, 3 do
+            zs[i].count   = 0
+            zs[i].combat  = false
+            zs[i].results = {}
+        end
 
     elseif sub == 'help' then
-        print('[EAS] ---- EventAreaSearch コマンド ----')
-        print('  /eas              ウィンドウ 表示/非表示')
-        print('  /eas on/off       監視 開始/停止')
-        print('  /eas search       手動サーチ')
-        print('  /eas zone <name>  対象ゾーン名設定')
-        print('  /eas zoneid <n>   ゾーン ID フィルタ設定（0=なし）')
-        print('  /eas threshold <n> 戦闘検知しきい値（デフォルト 10）')
-        print('  /eas interval <n> サーチ間隔（秒、デフォルト 300）')
-        print('  /eas debug        パケットデバッグ 有効/無効')
-        print('  /eas clear        結果クリア')
+        print('[EAS] ---- EventAreaSearch v' .. addon.version .. ' ----')
+        print('  /eas                  ウィンドウ 表示/非表示')
+        print('  /eas on/off           監視 開始/停止')
+        print('  /eas search           手動サーチ（全ゾーン）')
+        print('  /eas zone <1-3> <name> ゾーン名設定')
+        print('  /eas zoneid <1-3> <id> ゾーン ID 設定')
+        print('  /eas threshold <n>    戦闘検知しきい値（デフォルト 10）')
+        print('  /eas interval <n>     サーチ間隔（秒、デフォルト 300）')
+        print('  /eas debug            パケットデバッグ 有効/無効')
+        print('  /eas clear            結果クリア')
     end
 end)
 
