@@ -71,24 +71,44 @@ end
 -- ============================================================
 -- バフ残り時間取得（秒）
 -- 取得できない場合は -1 を返す（表示側で "ACTIVE" にフォールバック）
--- GetBuffTimers() の存在は実機依存のため pcall でラップ
+-- Ashita v4 の複数APIを順に試みる
 -- ============================================================
 local function get_buff_remaining(buff_id)
-    local ok, result = pcall(function()
+    -- 方法1: GetStatusEffectTimers（Ashita v4 新API）
+    local ok1, r1 = pcall(function()
         local player = AshitaCore:GetMemoryManager():GetPlayer()
         if player == nil then return -1 end
-        local buffs   = player:GetBuffs()
-        local timers  = player:GetBuffTimers()
-        if buffs == nil or timers == nil then return -1 end
-        for i = 1, #buffs do
-            if buffs[i] == buff_id then
-                local t = timers[i]
-                return (t ~= nil and type(t) == 'number') and t or -1
+        local count = player:GetStatusEffectCount()
+        if count == nil then return -1 end
+        for i = 0, count - 1 do
+            local id = player:GetStatusEffectIdByIndex(i)
+            if id == buff_id then
+                local t = player:GetStatusEffectDurationByIndex(i)
+                return (t ~= nil and type(t) == 'number' and t > 0) and t or -1
             end
         end
         return -1
     end)
-    return (ok and type(result) == 'number') and result or -1
+    if ok1 and type(r1) == 'number' and r1 >= 0 then return r1 end
+
+    -- 方法2: GetBuffTimers（旧API）
+    local ok2, r2 = pcall(function()
+        local player = AshitaCore:GetMemoryManager():GetPlayer()
+        if player == nil then return -1 end
+        local buffs  = player:GetBuffs()
+        local timers = player:GetBuffTimers()
+        if buffs == nil or timers == nil then return -1 end
+        for i = 1, #buffs do
+            if buffs[i] == buff_id then
+                local t = timers[i]
+                return (t ~= nil and type(t) == 'number' and t > 0) and t or -1
+            end
+        end
+        return -1
+    end)
+    if ok2 and type(r2) == 'number' and r2 >= 0 then return r2 end
+
+    return -1
 end
 
 -- ============================================================
@@ -170,9 +190,9 @@ local function draw_phalanx_panel(has_ph, ph_remain, ph_recast)
     local fast  = math.floor(t * 4) % 2 == 0  -- 4Hz点滅
     local slow  = math.floor(t * 2) % 2 == 0  -- 2Hz点滅
 
-    -- リキャスト記号（◎ or ×）
+    -- リキャスト記号
     local rc_ready  = (ph_recast <= 0)
-    local rc_symbol = rc_ready and '\xe2\x97\x8e' or '\xc3\x97'  -- ◎ / ×
+    local rc_symbol = rc_ready and '[O]' or '[X]'
     local rc_color  = rc_ready and { 0.3, 1.0, 0.3, 1.0 } or { 1.0, 0.3, 0.3, 1.0 }
 
     -- 残り時間テキスト
@@ -199,7 +219,7 @@ local function draw_phalanx_panel(has_ph, ph_remain, ph_recast)
         else
             -- 余裕あり: 緑
             imgui.PushStyleColor(ImGuiCol_Text, { 0.3, 1.0, 0.4, 1.0 })
-            imgui.Text(' \xe2\x96\xa0 PHALANX ON \xe2\x96\xa0')  -- ■ PHALANX ON ■
+            imgui.Text('* PHALANX ON *')
         end
         imgui.PopStyleColor()
     else
@@ -212,7 +232,7 @@ local function draw_phalanx_panel(has_ph, ph_remain, ph_recast)
             -- バフOFF + RC中 → 低速赤点滅
             local c = slow and { 1.0, 0.25, 0.25, 1.0 } or { 0.65, 0.1, 0.1, 1.0 }
             imgui.PushStyleColor(ImGuiCol_Text, c)
-            imgui.Text(' !! PHALANX OFF !!')
+            imgui.Text('!! PHALANX OFF !!')
         end
         imgui.PopStyleColor()
     end
@@ -225,7 +245,7 @@ local function draw_phalanx_panel(has_ph, ph_remain, ph_recast)
         and { 0.85, 0.95, 0.85, 1.0 }
         or  { 0.65, 0.65, 0.65, 1.0 }
     imgui.PushStyleColor(ImGuiCol_Text, remain_color)
-    imgui.Text(string.format('  \xe6\xae\x8b\xe3\x82\x8a: %-6s', remain_str))  -- 残り:
+    imgui.Text(string.format('  Time: %-6s', remain_str))
     imgui.PopStyleColor()
 
     -- RC記号（同じ行に横並び）
@@ -363,15 +383,34 @@ ashita.events.register('command', 'battleassist_command', function(e)
         end)
         if not ok2 then print('[BattleAssist] スペルデバッグ中にエラーが発生しました') end
 
-        -- バフタイマー取得テスト
+        -- バフタイマー取得テスト（複数API）
         print('[BattleAssist] === バフタイマー取得テスト ===')
-        local ok3 = pcall(function()
+
+        -- 方法1: GetStatusEffectCount / GetStatusEffectIdByIndex
+        print('[BattleAssist] [方法1] GetStatusEffectCount...')
+        local ok3a = pcall(function()
             local player = AshitaCore:GetMemoryManager():GetPlayer()
-            if player == nil then print('[BattleAssist] GetPlayer() が nil') return end
+            if player == nil then print('[BattleAssist]  GetPlayer() が nil') return end
+            local count = player:GetStatusEffectCount()
+            if count == nil then print('[BattleAssist]  GetStatusEffectCount() が nil') return end
+            print(string.format('[BattleAssist]  count=%d', count))
+            for i = 0, count - 1 do
+                local id  = player:GetStatusEffectIdByIndex(i)
+                local dur = player:GetStatusEffectDurationByIndex(i)
+                print(string.format('[BattleAssist]  [%d] id=%s  duration=%s', i, tostring(id), tostring(dur)))
+            end
+        end)
+        if not ok3a then print('[BattleAssist]  方法1 エラー（APIが存在しない可能性）') end
+
+        -- 方法2: GetBuffTimers
+        print('[BattleAssist] [方法2] GetBuffTimers...')
+        local ok3b = pcall(function()
+            local player = AshitaCore:GetMemoryManager():GetPlayer()
+            if player == nil then return end
             local buffs  = player:GetBuffs()
             local timers = player:GetBuffTimers()
             if timers == nil then
-                print('[BattleAssist] GetBuffTimers() は未対応（残り時間表示不可）')
+                print('[BattleAssist]  GetBuffTimers() が nil（未対応）')
                 return
             end
             for i = 1, #buffs do
@@ -381,7 +420,7 @@ ashita.events.register('command', 'battleassist_command', function(e)
                 end
             end
         end)
-        if not ok3 then print('[BattleAssist] バフタイマーテスト中にエラーが発生しました') end
+        if not ok3b then print('[BattleAssist]  方法2 エラー') end
 
         e.blocked = true
 
