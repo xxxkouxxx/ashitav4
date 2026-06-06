@@ -6,7 +6,7 @@
 
 addon.name    = 'BattleAssist'
 addon.author  = '7xxxk'
-addon.version = '4.1'
+addon.version = '4.2'
 addon.desc    = 'PLD向けファランクス最優先バフ監視 HUD'
 
 require('common')
@@ -96,45 +96,44 @@ end
 
 -- ============================================================
 -- バフ残り時間取得（秒）
--- 取得できない場合は -1 を返す（表示側で "ACTIVE" にフォールバック）
--- Ashita v4 の複数APIを順に試みる
+-- statustimers アドオンと同じ方式:
+--   player:GetStatusIcons()  → バフIDの配列
+--   player:GetStatusTimers() → 生タイマー値の配列（ヴァナ紀元ベース）
+-- 取得できない場合は -1 を返す
 -- ============================================================
+local VANA_EPOCH     = 0x3C307D70  -- ヴァナ・ディール紀元 Unix タイムスタンプ（2002年1月）
+local INFINITE_TIMER = 0x7FFFFFFF  -- 無限バフのマーカー値
+
+local function calc_remain_secs(raw_timer)
+    if raw_timer == nil or raw_timer == 0 or raw_timer == INFINITE_TIMER then
+        return -1
+    end
+    local offset   = os.time() - VANA_EPOCH
+    local comparand = offset * 60
+    local remain   = raw_timer - comparand
+    -- トリエニアル（3年周期）オーバーフロー対策
+    while remain < -2147483648 do
+        remain = remain + 0xFFFFFFFF
+    end
+    if remain < 1 then return 0 end
+    return math.ceil(remain / 60)
+end
+
 local function get_buff_remaining(buff_id)
-    -- 方法1: GetStatusEffectTimers（Ashita v4 新API）
-    local ok1, r1 = pcall(function()
+    local ok, result = pcall(function()
         local player = AshitaCore:GetMemoryManager():GetPlayer()
         if player == nil then return -1 end
-        local count = player:GetStatusEffectCount()
-        if count == nil then return -1 end
-        for i = 0, count - 1 do
-            local id = player:GetStatusEffectIdByIndex(i)
-            if id == buff_id then
-                local t = player:GetStatusEffectDurationByIndex(i)
-                return (t ~= nil and type(t) == 'number' and t > 0) and t or -1
+        local icons  = player:GetStatusIcons()
+        local timers = player:GetStatusTimers()
+        if icons == nil or timers == nil then return -1 end
+        for i = 1, #icons do
+            if icons[i] == buff_id then
+                return calc_remain_secs(timers[i])
             end
         end
         return -1
     end)
-    if ok1 and type(r1) == 'number' and r1 >= 0 then return r1 end
-
-    -- 方法2: GetBuffTimers（旧API）
-    local ok2, r2 = pcall(function()
-        local player = AshitaCore:GetMemoryManager():GetPlayer()
-        if player == nil then return -1 end
-        local buffs  = player:GetBuffs()
-        local timers = player:GetBuffTimers()
-        if buffs == nil or timers == nil then return -1 end
-        for i = 1, #buffs do
-            if buffs[i] == buff_id then
-                local t = timers[i]
-                return (t ~= nil and type(t) == 'number' and t > 0) and t or -1
-            end
-        end
-        return -1
-    end)
-    if ok2 and type(r2) == 'number' and r2 >= 0 then return r2 end
-
-    return -1
+    return (ok and type(result) == 'number') and result or -1
 end
 
 -- ============================================================
@@ -409,84 +408,36 @@ ashita.events.register('command', 'battleassist_command', function(e)
         end)
         if not ok2 then print('[BattleAssist] スペルデバッグ中にエラーが発生しました') end
 
-        -- buff timer API test (ASCII only for readability)
-        print('[BattleAssist] === BUFF TIMER API TEST ===')
-
-        -- Test A: GetStatusEffectCount / GetStatusEffectIdByIndex / GetStatusEffectDurationByIndex
-        print('[BattleAssist] [A] GetStatusEffectCount...')
-        local okA = pcall(function()
+        -- GetStatusIcons / GetStatusTimers test
+        print('[BattleAssist] === STATUS ICONS / TIMERS TEST ===')
+        local okST = pcall(function()
             local player = AshitaCore:GetMemoryManager():GetPlayer()
             if player == nil then print('[BattleAssist]  player nil') return end
-            local count = player:GetStatusEffectCount()
-            if count == nil then print('[BattleAssist]  GetStatusEffectCount() = nil') return end
-            print(string.format('[BattleAssist]  count = %d', count))
-            for i = 0, count - 1 do
-                local id  = player:GetStatusEffectIdByIndex(i)
-                local dur = player:GetStatusEffectDurationByIndex(i)
-                print(string.format('[BattleAssist]    [%d] id=%s dur=%s', i, tostring(id), tostring(dur)))
-            end
-        end)
-        if not okA then print('[BattleAssist]  [A] ERROR (API not found)') end
-
-        -- Test B: GetBuffTimers
-        print('[BattleAssist] [B] GetBuffTimers...')
-        local okB = pcall(function()
-            local player = AshitaCore:GetMemoryManager():GetPlayer()
-            if player == nil then return end
-            local buffs  = player:GetBuffs()
-            local timers = player:GetBuffTimers()
-            if timers == nil then
-                print('[BattleAssist]  GetBuffTimers() = nil')
+            local icons  = player:GetStatusIcons()
+            local timers = player:GetStatusTimers()
+            if icons == nil then
+                print('[BattleAssist]  GetStatusIcons() = nil')
                 return
             end
-            for i = 1, #buffs do
-                if buffs[i] ~= nil and buffs[i] > 0 and buffs[i] ~= 0xFFFF then
-                    print(string.format('[BattleAssist]    buff_id=%d timer=%s', buffs[i], tostring(timers[i])))
+            if timers == nil then
+                print('[BattleAssist]  GetStatusTimers() = nil')
+                return
+            end
+            print(string.format('[BattleAssist]  icons count=%d  timers count=%d', #icons, #timers))
+            local utc = os.time()
+            print(string.format('[BattleAssist]  os.time()=%d  VANA_EPOCH=%d  offset=%d', utc, VANA_EPOCH, utc - VANA_EPOCH))
+            for i = 1, #icons do
+                local id = icons[i]
+                if id ~= nil and id > 0 and id ~= 255 and id ~= 0xFFFF then
+                    local raw = timers[i]
+                    local secs = calc_remain_secs(raw)
+                    print(string.format('[BattleAssist]    slot=%d  id=%d  raw=%s  remain=%ds',
+                        i, id, tostring(raw), secs))
                 end
             end
         end)
-        if not okB then print('[BattleAssist]  [B] ERROR') end
-
-        -- Test C: Party member 0 buff timers
-        print('[BattleAssist] [C] Party member 0 buff timers...')
-        local okC = pcall(function()
-            local party = AshitaCore:GetMemoryManager():GetParty()
-            if party == nil then print('[BattleAssist]  party nil') return end
-            for i = 0, 31 do
-                local bid = party:GetMemberBuffsByIndex(0, i)
-                if bid ~= nil and bid > 0 and bid ~= 0xFFFF then
-                    local t = nil
-                    pcall(function() t = party:GetMemberBuffTimersByIndex(0, i) end)
-                    print(string.format('[BattleAssist]    slot=%d buff_id=%d timer=%s', i, bid, tostring(t)))
-                end
-            end
-        end)
-        if not okC then print('[BattleAssist]  [C] ERROR') end
-
-        -- Test D: Entity-based status effects for local player
-        print('[BattleAssist] [D] Entity status effects...')
-        local okD = pcall(function()
-            local player = AshitaCore:GetMemoryManager():GetPlayer()
-            if player == nil then return end
-            -- try GetServerId or GetTargetIndex to find entity index
-            local eidx = nil
-            pcall(function() eidx = player:GetTargetIndex() end)
-            if eidx == nil then pcall(function() eidx = player:GetEntityIndex() end) end
-            print(string.format('[BattleAssist]  entity index = %s', tostring(eidx)))
-            if eidx == nil then return end
-            local entity = AshitaCore:GetMemoryManager():GetEntity()
-            if entity == nil then print('[BattleAssist]  entity manager nil') return end
-            for i = 0, 31 do
-                local ok2, id = pcall(function() return entity:GetStatusEffect(eidx, i) end)
-                local ok3, t  = pcall(function() return entity:GetStatusEffectTimer(eidx, i) end)
-                if ok2 and id ~= nil and id > 0 then
-                    print(string.format('[BattleAssist]    [%d] id=%s timer=%s', i, tostring(id), ok3 and tostring(t) or 'n/a'))
-                end
-            end
-        end)
-        if not okD then print('[BattleAssist]  [D] ERROR') end
-
-        print('[BattleAssist] === END BUFF TIMER TEST ===')
+        if not okST then print('[BattleAssist]  ERROR - GetStatusIcons/GetStatusTimers failed') end
+        print('[BattleAssist] === END TEST ===')
 
         e.blocked = true
 
@@ -507,8 +458,8 @@ end)
 -- ============================================================
 ashita.events.register('load', 'battleassist_load', function()
     cfg = settings.load(default_settings)
-    print('[BattleAssist] v4.1 loaded.')
-    print('[BattleAssist] Phalanx spell_id=36（暫定値）。/ba debug で実機確認してください。')
+    print('[BattleAssist] v4.2 loaded.')
+    print('[BattleAssist] Phalanx spell_id=36 (tentative). Run /ba debug to verify.')
 end)
 
 ashita.events.register('unload', 'battleassist_unload', function()
