@@ -37,7 +37,7 @@ local BUFF_REPRISAL = 403
 local BUFF_CRUSADE  = 289
 
 -- ファランクスのスペルリキャスト（spell_id は /ba debug で実機確認。暫定36）
-local PHALANX_SPELL_ID = 36
+local PHALANX_SPELL_ID = 106  -- 暫定値。/ba debug で spell_id=XX の行を確認して修正
 
 -- ============================================================
 -- アビリティリキャスト定義（call_id は /ba debug で実機確認）
@@ -374,14 +374,11 @@ ashita.events.register('command', 'battleassist_command', function(e)
     if args[1] ~= '/ba' then return end
 
     if args[2] == 'debug' then
-        -- アビリティリキャストスロット一覧
-        print('[BattleAssist] === アビリティリキャスト スロット一覧 ===')
+        -- ability recast slots
+        print('[BattleAssist] === ABILITY RECAST SLOTS ===')
         local ok = pcall(function()
             local recast = AshitaCore:GetMemoryManager():GetRecast()
-            if recast == nil then
-                print('[BattleAssist] GetRecast() が nil です')
-                return
-            end
+            if recast == nil then print('[BattleAssist]  GetRecast() = nil') return end
             for i = 0, 31 do
                 local call  = recast:GetAbilityCallByIndex(i)
                 local timer = recast:GetAbilityTimerByIndex(i)
@@ -391,22 +388,22 @@ ashita.events.register('command', 'battleassist_command', function(e)
                 end
             end
         end)
-        if not ok then print('[BattleAssist] デバッグ中にエラーが発生しました') end
+        if not ok then print('[BattleAssist]  ERROR in ability recast') end
 
-        -- スペルリキャストスロット一覧
-        print('[BattleAssist] === スペルリキャスト（リキャスト中のみ）===')
+        -- spell recast slots (active only)
+        print('[BattleAssist] === SPELL RECAST (active only) ===')
         local ok2 = pcall(function()
             local recast = AshitaCore:GetMemoryManager():GetRecast()
             if recast == nil then return end
             for i = 0, 1023 do
                 local timer = recast:GetSpellTimerByIndex(i)
                 if timer ~= nil and timer > 0 then
-                    print(string.format('[BattleAssist]  spell_id=%d  timer=%d (約%ds)',
+                    print(string.format('[BattleAssist]  spell_id=%d  timer=%d (approx %ds)',
                         i, timer, math.ceil(timer / 4)))
                 end
             end
         end)
-        if not ok2 then print('[BattleAssist] スペルデバッグ中にエラーが発生しました') end
+        if not ok2 then print('[BattleAssist]  ERROR in spell recast') end
 
         -- GetStatusIcons / GetStatusTimers test
         print('[BattleAssist] === STATUS ICONS / TIMERS TEST ===')
