@@ -17,9 +17,10 @@ local imgui = require('imgui')
 -- 設定デフォルト値
 -- ============================================================
 local default_settings = T{
-    x       = 10,
-    y       = 10,
-    visible = true,
+    x                = 10,
+    y                = 10,
+    visible          = true,
+    phalanx_duration = 180,  -- ファランクス効果時間（秒）。/ba ph <秒> で変更
 }
 local cfg = T{}
 
@@ -53,6 +54,31 @@ local ABILITY_DEFS = {
 local buff_check_timer   = 0
 local prev_missing_count = 0
 local buff_watch_ready   = false
+
+-- ============================================================
+-- ファランクス自己追跡タイマー
+-- API でバフ残り時間が取れないため、バフ付与タイミングを自前で記録する
+-- ============================================================
+local ph_track = {
+    active     = false,
+    start_time = 0.0,
+}
+
+local function update_phalanx_track(has_ph)
+    if has_ph and not ph_track.active then
+        ph_track.active     = true
+        ph_track.start_time = imgui.GetTime()
+    elseif not has_ph then
+        ph_track.active = false
+    end
+end
+
+local function get_phalanx_self_remain()
+    if not ph_track.active then return -1 end
+    local elapsed = imgui.GetTime() - ph_track.start_time
+    local remain  = cfg.phalanx_duration - elapsed
+    return (remain >= 0) and remain or 0
+end
 
 -- ============================================================
 -- バフ有無チェック
@@ -383,44 +409,84 @@ ashita.events.register('command', 'battleassist_command', function(e)
         end)
         if not ok2 then print('[BattleAssist] スペルデバッグ中にエラーが発生しました') end
 
-        -- バフタイマー取得テスト（複数API）
-        print('[BattleAssist] === バフタイマー取得テスト ===')
+        -- buff timer API test (ASCII only for readability)
+        print('[BattleAssist] === BUFF TIMER API TEST ===')
 
-        -- 方法1: GetStatusEffectCount / GetStatusEffectIdByIndex
-        print('[BattleAssist] [方法1] GetStatusEffectCount...')
-        local ok3a = pcall(function()
+        -- Test A: GetStatusEffectCount / GetStatusEffectIdByIndex / GetStatusEffectDurationByIndex
+        print('[BattleAssist] [A] GetStatusEffectCount...')
+        local okA = pcall(function()
             local player = AshitaCore:GetMemoryManager():GetPlayer()
-            if player == nil then print('[BattleAssist]  GetPlayer() が nil') return end
+            if player == nil then print('[BattleAssist]  player nil') return end
             local count = player:GetStatusEffectCount()
-            if count == nil then print('[BattleAssist]  GetStatusEffectCount() が nil') return end
-            print(string.format('[BattleAssist]  count=%d', count))
+            if count == nil then print('[BattleAssist]  GetStatusEffectCount() = nil') return end
+            print(string.format('[BattleAssist]  count = %d', count))
             for i = 0, count - 1 do
                 local id  = player:GetStatusEffectIdByIndex(i)
                 local dur = player:GetStatusEffectDurationByIndex(i)
-                print(string.format('[BattleAssist]  [%d] id=%s  duration=%s', i, tostring(id), tostring(dur)))
+                print(string.format('[BattleAssist]    [%d] id=%s dur=%s', i, tostring(id), tostring(dur)))
             end
         end)
-        if not ok3a then print('[BattleAssist]  方法1 エラー（APIが存在しない可能性）') end
+        if not okA then print('[BattleAssist]  [A] ERROR (API not found)') end
 
-        -- 方法2: GetBuffTimers
-        print('[BattleAssist] [方法2] GetBuffTimers...')
-        local ok3b = pcall(function()
+        -- Test B: GetBuffTimers
+        print('[BattleAssist] [B] GetBuffTimers...')
+        local okB = pcall(function()
             local player = AshitaCore:GetMemoryManager():GetPlayer()
             if player == nil then return end
             local buffs  = player:GetBuffs()
             local timers = player:GetBuffTimers()
             if timers == nil then
-                print('[BattleAssist]  GetBuffTimers() が nil（未対応）')
+                print('[BattleAssist]  GetBuffTimers() = nil')
                 return
             end
             for i = 1, #buffs do
                 if buffs[i] ~= nil and buffs[i] > 0 and buffs[i] ~= 0xFFFF then
-                    print(string.format('[BattleAssist]  buff_id=%d  timer=%s',
-                        buffs[i], tostring(timers[i])))
+                    print(string.format('[BattleAssist]    buff_id=%d timer=%s', buffs[i], tostring(timers[i])))
                 end
             end
         end)
-        if not ok3b then print('[BattleAssist]  方法2 エラー') end
+        if not okB then print('[BattleAssist]  [B] ERROR') end
+
+        -- Test C: Party member 0 buff timers
+        print('[BattleAssist] [C] Party member 0 buff timers...')
+        local okC = pcall(function()
+            local party = AshitaCore:GetMemoryManager():GetParty()
+            if party == nil then print('[BattleAssist]  party nil') return end
+            for i = 0, 31 do
+                local bid = party:GetMemberBuffsByIndex(0, i)
+                if bid ~= nil and bid > 0 and bid ~= 0xFFFF then
+                    local t = nil
+                    pcall(function() t = party:GetMemberBuffTimersByIndex(0, i) end)
+                    print(string.format('[BattleAssist]    slot=%d buff_id=%d timer=%s', i, bid, tostring(t)))
+                end
+            end
+        end)
+        if not okC then print('[BattleAssist]  [C] ERROR') end
+
+        -- Test D: Entity-based status effects for local player
+        print('[BattleAssist] [D] Entity status effects...')
+        local okD = pcall(function()
+            local player = AshitaCore:GetMemoryManager():GetPlayer()
+            if player == nil then return end
+            -- try GetServerId or GetTargetIndex to find entity index
+            local eidx = nil
+            pcall(function() eidx = player:GetTargetIndex() end)
+            if eidx == nil then pcall(function() eidx = player:GetEntityIndex() end) end
+            print(string.format('[BattleAssist]  entity index = %s', tostring(eidx)))
+            if eidx == nil then return end
+            local entity = AshitaCore:GetMemoryManager():GetEntity()
+            if entity == nil then print('[BattleAssist]  entity manager nil') return end
+            for i = 0, 31 do
+                local ok2, id = pcall(function() return entity:GetStatusEffect(eidx, i) end)
+                local ok3, t  = pcall(function() return entity:GetStatusEffectTimer(eidx, i) end)
+                if ok2 and id ~= nil and id > 0 then
+                    print(string.format('[BattleAssist]    [%d] id=%s timer=%s', i, tostring(id), ok3 and tostring(t) or 'n/a'))
+                end
+            end
+        end)
+        if not okD then print('[BattleAssist]  [D] ERROR') end
+
+        print('[BattleAssist] === END BUFF TIMER TEST ===')
 
         e.blocked = true
 
