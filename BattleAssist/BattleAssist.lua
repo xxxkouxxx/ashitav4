@@ -64,8 +64,9 @@ local ph_recast_track = {
 
 local function get_phalanx_rc_remain()
     if ph_recast_track.cast_time < 0 then return 0 end  -- 不明 → 使用可とみなす
-    local elapsed = imgui.GetTime() - ph_recast_track.cast_time
-    local remain  = cfg.phalanx_recast - elapsed
+    local elapsed  = imgui.GetTime() - ph_recast_track.cast_time
+    local duration = cfg.phalanx_recast or 60  -- nil対策フォールバック
+    local remain   = duration - elapsed
     return (remain > 0) and remain or 0
 end
 
@@ -430,8 +431,13 @@ end)
 -- ============================================================
 ashita.events.register('load', 'battleassist_load', function()
     cfg = settings.load(default_settings)
-    print('[BattleAssist] v4.2 loaded.')
-    print('[BattleAssist] Phalanx spell_id=36 (tentative). Run /ba debug to verify.')
+    -- 旧設定ファイルに phalanx_recast がない場合はデフォルト値を補完して保存
+    if not cfg.phalanx_recast then
+        cfg.phalanx_recast = 60
+        settings.save()
+    end
+    print('[BattleAssist] v4.3 loaded.')
+    print(string.format('[BattleAssist] Phalanx recast: %ds  (change: /ba rc <seconds>)', cfg.phalanx_recast))
 end)
 
 ashita.events.register('unload', 'battleassist_unload', function()
