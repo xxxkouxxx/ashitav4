@@ -70,27 +70,43 @@ end
 -- PlayOnline USER ディレクトリを取得 (FFI不使用・os.execute + io.open のみ)
 local POL_USER_BASE = 'C:\\Program Files (x86)\\PlayOnline\\SquareEnix\\FINAL FANTASY XI\\USER\\'
 
-local function find_pol_user_dir()
+-- ゲーム内キャラ名に一致するUSERフォルダを返す
+-- ffxiusr.msg にキャラ名が含まれているフォルダを優先し、
+-- 見つからない場合は es0.dat の更新日時が最新のフォルダを使用する
+local function find_pol_user_dir(char_name)
     local tmpfile = AshitaCore:GetInstallPath() .. 'poldir.tmp'
-    os.execute('dir /b /ad /od "' .. POL_USER_BASE .. '" > "' .. tmpfile .. '" 2>nul')
-    local found_dir = nil
+    os.execute('dir /b /ad "' .. POL_USER_BASE .. '" > "' .. tmpfile .. '" 2>nul')
     local f = io.open(tmpfile, 'r')
-    if f then
-        for line in f:lines() do
-            local name = line:match('^([%x]+)$')
-            if name then
-                local candidate = POL_USER_BASE .. name .. '\\'
-                local test = io.open(candidate .. 'mcr.dat', 'rb')
-                if test then
-                    test:close()
-                    found_dir = candidate
+    if not f then return nil end
+
+    local matched_dir  = nil
+    local fallback_dir = nil
+
+    for line in f:lines() do
+        local name = line:match('^([%x]+)%s*$')
+        if name then
+            local candidate = POL_USER_BASE .. name .. '\\'
+            local es = io.open(candidate .. 'es0.dat', 'rb')
+            if es then
+                es:close()
+                -- ffxiusr.msg でキャラ名照合
+                if char_name and char_name ~= '' then
+                    local msg = io.open(candidate .. 'ffxiusr.msg', 'rb')
+                    if msg then
+                        local content = msg:read('*all')
+                        msg:close()
+                        if content:find(char_name, 1, true) then
+                            matched_dir = candidate
+                        end
+                    end
                 end
+                fallback_dir = candidate
             end
         end
-        f:close()
-        os.remove(tmpfile)
     end
-    return found_dir
+    f:close()
+    os.remove(tmpfile)
+    return matched_dir or fallback_dir
 end
 
 -- バイナリ文字列からNull終端を除いてUTF-8に変換（タイトル・装備名など純粋ShiftJIS用）
@@ -225,7 +241,7 @@ local function find_macro_files(user_dir)
 end
 
 local function export_macros(char_name, out_path)
-    local user_dir = find_pol_user_dir()
+    local user_dir = find_pol_user_dir(char_name)
     if not user_dir then
         print(chat.header(addon.name) .. chat.error('PlayOnline USER directory not found.'))
         return
@@ -306,15 +322,15 @@ end
 
 local SLOT_NAMES = {
     [0]  = 'Main',     [1]  = 'Sub',      [2]  = 'Range',
-    [3]  = 'Ammo',     [4]  = 'Head',     [5]  = 'Body',
-    [6]  = 'Hands',    [7]  = 'Legs',     [8]  = 'Feet',
-    [9]  = 'Neck',     [10] = 'Waist',    [11] = 'Earring1',
-    [12] = 'Earring2', [13] = 'Ring1',    [14] = 'Ring2',
-    [15] = 'Back',
+    [3]  = 'Ammo',     [4]  = 'Head',     [5]  = 'Neck',
+    [6]  = 'Earring1', [7]  = 'Earring2', [8]  = 'Body',
+    [9]  = 'Hands',    [10] = 'Ring1',    [11] = 'Ring2',
+    [12] = 'Back',     [13] = 'Waist',    [14] = 'Legs',
+    [15] = 'Feet',
 }
 
 local function export_equipsets(char_name, out_path)
-    local user_dir = find_pol_user_dir()
+    local user_dir = find_pol_user_dir(char_name)
     if not user_dir then
         print(chat.header(addon.name) .. chat.error('PlayOnline USER directory not found.'))
         return
@@ -323,7 +339,8 @@ local function export_equipsets(char_name, out_path)
     local HEADER_SIZE = 24
     local ENTRY_SIZE  = 80
     local NAME_SIZE   = 16   -- セット名フィールド
-    local NUM_SLOTS   = 16   -- スロット数 (各4バイト: item_id 2B + extra 2B)
+    local PADDING1    = 16   -- 名前フィールド後のパディング
+    local NUM_SLOTS   = 16   -- スロット数 (各2バイト: item_id 2B)
     local rman = AshitaCore:GetResourceManager()
 
     local header = {'セットNo', 'セット名'}
@@ -347,10 +364,10 @@ local function export_equipsets(char_name, out_path)
             set_index = set_index + 1
             local base_off = HEADER_SIZE + i * ENTRY_SIZE
             local set_name = bin_to_utf8(data, base_off, NAME_SIZE)
-            -- アイテムID: 16スロット × 2バイト
+            -- アイテムID: 名前(16) + パディング(16) の後に 16スロット × 2バイト
             local items = {}
             for s = 0, NUM_SLOTS - 1 do
-                local id_off  = base_off + NAME_SIZE + s * 4
+                local id_off  = base_off + NAME_SIZE + PADDING1 + s * 2
                 local lo      = data:byte(id_off + 1) or 0
                 local hi      = data:byte(id_off + 2) or 0
                 local item_id = lo + hi * 256
