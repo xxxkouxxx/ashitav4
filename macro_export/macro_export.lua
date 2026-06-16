@@ -334,8 +334,10 @@ local function export_equipsets(char_name, out_path)
     local HEADER_SIZE = 24
     local ENTRY_SIZE  = 80
     local NAME_SIZE   = 16   -- セット名フィールド
-    local PADDING1    = 16   -- 名前フィールド後のパディング
-    local NUM_SLOTS   = 16   -- スロット数 (各2バイト: item_id 2B)
+    local NUM_SLOTS   = 16   -- スロット数
+    -- 各スロットは4バイト: bytes 0-1 = 不明/augment、bytes 2-3 = item_id
+    local SLOT_STRIDE = 4
+    local SLOT_ID_OFF = 2    -- スロット内 item_id のバイトオフセット
     local rman = AshitaCore:GetResourceManager()
 
     local header = {'セットNo', 'セット名'}
@@ -359,10 +361,11 @@ local function export_equipsets(char_name, out_path)
             set_index = set_index + 1
             local base_off = HEADER_SIZE + i * ENTRY_SIZE
             local set_name = bin_to_utf8(data, base_off, NAME_SIZE)
-            -- アイテムID: 名前(16) + パディング(16) の後に 16スロット × 2バイト
+            -- アイテムID: 名前(16バイト) の後に 16スロット × 4バイト
+            -- 各4バイトの後半2バイトが item_id
             local items = {}
             for s = 0, NUM_SLOTS - 1 do
-                local id_off  = base_off + NAME_SIZE + PADDING1 + s * 2
+                local id_off  = base_off + NAME_SIZE + s * SLOT_STRIDE + SLOT_ID_OFF
                 local lo      = data:byte(id_off + 1) or 0
                 local hi      = data:byte(id_off + 2) or 0
                 local item_id = lo + hi * 256
