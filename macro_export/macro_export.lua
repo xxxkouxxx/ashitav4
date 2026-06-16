@@ -70,43 +70,29 @@ end
 -- PlayOnline USER ディレクトリを取得 (FFI不使用・os.execute + io.open のみ)
 local POL_USER_BASE = 'C:\\Program Files (x86)\\PlayOnline\\SquareEnix\\FINAL FANTASY XI\\USER\\'
 
--- ゲーム内キャラ名に一致するUSERフォルダを返す
--- ffxiusr.msg にキャラ名が含まれているフォルダを優先し、
--- 見つからない場合は es0.dat の更新日時が最新のフォルダを使用する
+-- es0.dat の更新日時が最新のUSERフォルダを返す（ログイン中キャラのフォルダ）
 local function find_pol_user_dir(char_name)
     local tmpfile = AshitaCore:GetInstallPath() .. 'poldir.tmp'
-    os.execute('dir /b /ad "' .. POL_USER_BASE .. '" > "' .. tmpfile .. '" 2>nul')
+    -- PowerShell で es0.dat を更新日時降順に並べ、最新フォルダのフルパスを取得
+    local ps_cmd = string.format(
+        'powershell -NoProfile -Command "Get-ChildItem \'%s*\\es0.dat\' | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { $_.Directory.FullName } | Out-File -Encoding utf8 \'%s\'"',
+        POL_USER_BASE, tmpfile)
+    os.execute(ps_cmd)
     local f = io.open(tmpfile, 'r')
     if not f then return nil end
-
-    local matched_dir  = nil
-    local fallback_dir = nil
-
+    local result = nil
     for line in f:lines() do
-        local name = line:match('^([%x]+)%s*$')
-        if name then
-            local candidate = POL_USER_BASE .. name .. '\\'
-            local es = io.open(candidate .. 'es0.dat', 'rb')
-            if es then
-                es:close()
-                -- ffxiusr.msg でキャラ名照合
-                if char_name and char_name ~= '' then
-                    local msg = io.open(candidate .. 'ffxiusr.msg', 'rb')
-                    if msg then
-                        local content = msg:read('*all')
-                        msg:close()
-                        if content:find(char_name, 1, true) then
-                            matched_dir = candidate
-                        end
-                    end
-                end
-                fallback_dir = candidate
-            end
+        local path = line:match('^%s*(.-)%s*$')
+        -- PowerShell UTF-8 BOM を除去
+        path = path:gsub('^\xEF\xBB\xBF', '')
+        if path ~= '' then
+            result = path .. '\\'
+            break
         end
     end
     f:close()
     os.remove(tmpfile)
-    return matched_dir or fallback_dir
+    return result
 end
 
 -- バイナリ文字列からNull終端を除いてUTF-8に変換（タイトル・装備名など純粋ShiftJIS用）
