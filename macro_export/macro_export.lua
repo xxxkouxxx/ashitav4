@@ -313,15 +313,19 @@ end
 -------------------------------------------------------------------------------
 -- es0.dat ～ es9.dat を順番に読む（各ファイル20セット、計200セット）
 -- フォーマット: ヘッダー24バイト + 20エントリ × 80バイト
---   各エントリ: 名前(16) + パディング(16) + 16スロット × 2バイトID + パディング(16)
+--   各エントリ: 名前(16) + 16スロット × 4バイト (bytes 0-1=不明, bytes 2-3=item_id)
 
+-- equipmon の slot 定義に基づく FFXI 公式スロット番号順
+-- 0x00=Main 0x01=Sub 0x02=Range 0x03=Ammo 0x04=Head 0x05=Body
+-- 0x06=Hands 0x07=Legs 0x08=Feet 0x09=Neck 0x0A=Waist 0x0B=Ear1
+-- 0x0C=Ear2 0x0D=Ring1 0x0E=Ring2 0x0F=Back
 local SLOT_NAMES = {
-    [0]  = 'Main',     [1]  = 'Sub',      [2]  = 'Range',
-    [3]  = 'Ammo',     [4]  = 'Head',     [5]  = 'Neck',
-    [6]  = 'Earring1', [7]  = 'Earring2', [8]  = 'Body',
-    [9]  = 'Hands',    [10] = 'Ring1',    [11] = 'Ring2',
-    [12] = 'Back',     [13] = 'Waist',    [14] = 'Legs',
-    [15] = 'Feet',
+    [0]  = 'Main',      [1]  = 'Sub',      [2]  = 'Range',
+    [3]  = 'Ammo',      [4]  = 'Head',     [5]  = 'Body',
+    [6]  = 'Hands',     [7]  = 'Legs',     [8]  = 'Feet',
+    [9]  = 'Neck',      [10] = 'Waist',    [11] = 'Earring1',
+    [12] = 'Earring2',  [13] = 'Ring1',    [14] = 'Ring2',
+    [15] = 'Back',
 }
 
 local function export_equipsets(char_name, out_path)
