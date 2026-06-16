@@ -147,6 +147,15 @@ local function decode_macro_line(buf, offset, size)
             i = i + 6
             if cat == 0x0D then
                 parts[#parts + 1] = SLASH_CMDS[sub] or string.format('/?:%02X', sub)
+            elseif cat == 0x1B then
+                local rman = AshitaCore:GetResourceManager()
+                local res  = rman:GetSpellById(sub)
+                local name = res and res.Name and res.Name[1]
+                if name and #name > 0 then
+                    parts[#parts + 1] = encoding:ShiftJIS_To_UTF8(name)
+                else
+                    parts[#parts + 1] = string.format('[ma:%02X]', sub)
+                end
             elseif cat == 0x1F or cat == 0x21 or cat == 0x2A then
                 local rman = AshitaCore:GetResourceManager()
                 local id = sub
